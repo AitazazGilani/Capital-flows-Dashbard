@@ -91,14 +91,17 @@ Every data function follows the same three-tier priority:
 ```
 Capital-flows-Dashboard/
 ├── app.py                     # Entry point, sidebar, home page
-├── config.py                  # All constants (countries, tickers, indicators)
-├── data_fetcher.py            # Data access: Parquet -> API -> Mock
-├── processors.py              # Derived indicators (net liquidity, ERP, etc.)
-├── chart_helpers.py           # Reusable Plotly charts (dark theme)
-├── claude_chat.py             # AI sidebar with context-aware responses
 ├── ingestor.py                # CLI tool for historical data ingestion
 ├── requirements.txt           # Python dependencies
 ├── .env                       # API keys (gitignored)
+│
+├── src/                       # Application source code
+│   ├── __init__.py
+│   ├── config.py              # All constants (countries, tickers, indicators)
+│   ├── data_fetcher.py        # Data access: Parquet -> API -> Mock
+│   ├── processors.py          # Derived indicators (net liquidity, ERP, etc.)
+│   ├── chart_helpers.py       # Reusable Plotly charts (dark theme)
+│   └── claude_chat.py         # AI sidebar with context-aware responses
 │
 ├── data/                      # Parquet store (gitignored, created by ingestor)
 │   ├── manifest.json          # Tracks what was ingested, when, status

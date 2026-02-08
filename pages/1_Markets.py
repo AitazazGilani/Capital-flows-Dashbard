@@ -4,15 +4,15 @@ Page 1: Markets — Equity indices, FX, commodities, volatility.
 
 import streamlit as st
 import pandas as pd
-from config import COUNTRIES, YF_PERIOD_MAP
-from data_fetcher import (
+from src.config import COUNTRIES, YF_PERIOD_MAP
+from src.data_fetcher import (
     get_index_data, get_multiple_tickers, get_fx_rates,
     get_dxy, get_commodities, get_volatility,
 )
-from chart_helpers import (
+from src.chart_helpers import (
     line_chart, dual_axis_chart, metric_row, heatmap,
 )
-from processors import compute_copper_gold_ratio
+from src.processors import compute_copper_gold_ratio
 
 st.session_state.current_page = "Markets"
 st.header("Markets")

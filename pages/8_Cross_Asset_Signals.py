@@ -8,16 +8,16 @@ This page turns the other 7 pages into a decision matrix.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from config import COUNTRIES, WB_INDICATORS, POLICY_RATES
-from data_fetcher import (
+from src.config import COUNTRIES, WB_INDICATORS, POLICY_RATES
+from src.data_fetcher import (
     get_index_data, get_multiple_tickers, get_fx_rates, get_commodities,
     get_wb_indicator, get_fred_series, get_policy_events,
 )
-from chart_helpers import (
+from src.chart_helpers import (
     line_chart, bar_chart, heatmap, sortable_table, metric_row,
     CHART_TEMPLATE, CHART_MARGINS, CHART_FONT, COLORS,
 )
-from processors import (
+from src.processors import (
     compute_rate_differentials, compute_equity_risk_premium,
     compute_relative_value_matrix, compute_cross_asset_momentum,
     compute_flow_signals, compute_macro_catalyst_score,

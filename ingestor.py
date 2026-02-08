@@ -33,7 +33,7 @@ try:
 except ImportError:
     pass
 
-from config import (
+from src.config import (
     COUNTRIES, FRED, WB_INDICATORS, MARKET_TICKERS,
     SEMI_TICKERS, SEMI_ETFS, SEMI_COMMODITIES,
     POLICY_CATEGORIES, POLICY_RATES, COUNTRY_PE_ESTIMATES,

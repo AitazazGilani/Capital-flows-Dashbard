@@ -4,7 +4,7 @@ Computed/derived indicators for the macro dashboard.
 
 import pandas as pd
 import numpy as np
-from config import COUNTRIES, POLICY_RATES, COUNTRY_PE_ESTIMATES
+from src.config import COUNTRIES, POLICY_RATES, COUNTRY_PE_ESTIMATES
 
 
 def compute_net_liquidity(fed_bs: pd.Series, tga: pd.Series, rrp: pd.Series) -> pd.Series:

@@ -8,8 +8,8 @@ This page tracks macro catalysts that move capital flows and markets.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from data_fetcher import get_policy_events, get_central_bank_calendar, get_tariff_tracker
-from chart_helpers import (
+from src.data_fetcher import get_policy_events, get_central_bank_calendar, get_tariff_tracker
+from src.chart_helpers import (
     CHART_TEMPLATE, CHART_MARGINS, CHART_FONT, COLORS, metric_row,
 )
 

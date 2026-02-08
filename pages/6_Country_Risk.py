@@ -4,14 +4,14 @@ Page 6: Country Risk — Debt sustainability, fiscal position, risk scores.
 
 import streamlit as st
 import pandas as pd
-from config import COUNTRIES, WB_INDICATORS
-from data_fetcher import (
+from src.config import COUNTRIES, WB_INDICATORS
+from src.data_fetcher import (
     get_wb_indicator, get_imf_gold_reserves,
 )
-from chart_helpers import (
+from src.chart_helpers import (
     line_chart, bar_chart, grouped_bar_chart, sortable_table, metric_row,
 )
-from processors import compute_risk_scores
+from src.processors import compute_risk_scores
 
 st.session_state.current_page = "Country Risk"
 st.header("Country Risk")

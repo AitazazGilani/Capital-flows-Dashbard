@@ -5,10 +5,10 @@ Page 2: Liquidity — Net liquidity, Fed balance sheet, M2.
 import streamlit as st
 import pandas as pd
 import numpy as np
-from config import FRED, YF_PERIOD_MAP
-from data_fetcher import get_fred_series, get_index_data
-from chart_helpers import line_chart, dual_axis_chart, stacked_area, metric_row
-from processors import compute_net_liquidity
+from src.config import FRED, YF_PERIOD_MAP
+from src.data_fetcher import get_fred_series, get_index_data
+from src.chart_helpers import line_chart, dual_axis_chart, stacked_area, metric_row
+from src.processors import compute_net_liquidity
 
 st.session_state.current_page = "Liquidity"
 st.header("Liquidity")

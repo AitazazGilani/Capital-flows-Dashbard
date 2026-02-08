@@ -15,7 +15,7 @@ import numpy as np
 import streamlit as st
 from datetime import datetime, timedelta
 from pathlib import Path
-from config import (
+from src.config import (
     COUNTRIES, MARKET_TICKERS, FRED, WB_INDICATORS, DATE_RANGES,
     SEMI_TICKERS, SEMI_ETFS, SEMI_COMMODITIES, POLICY_CATEGORIES,
 )
@@ -25,7 +25,7 @@ from config import (
 # Parquet loading layer
 # ---------------------------------------------------------------------------
 
-DATA_DIR = Path(__file__).parent / "data"
+DATA_DIR = Path(__file__).parent.parent / "data"
 
 # Periods considered "long" — prefer Parquet for these
 _LONG_PERIODS = {"1y", "3y", "5y", "10y", "max", "1Y", "3Y", "5Y", "10Y", "MAX"}

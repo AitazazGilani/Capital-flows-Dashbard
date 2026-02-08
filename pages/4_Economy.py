@@ -4,11 +4,11 @@ Page 4: Economy — GDP, inflation, employment, leading indicators.
 
 import streamlit as st
 import pandas as pd
-from config import COUNTRIES, FRED, WB_INDICATORS
-from data_fetcher import (
+from src.config import COUNTRIES, FRED, WB_INDICATORS
+from src.data_fetcher import (
     get_fred_series, get_wb_indicator, get_commodities,
 )
-from chart_helpers import (
+from src.chart_helpers import (
     line_chart, dual_axis_chart, grouped_bar_chart, metric_row,
 )
 
