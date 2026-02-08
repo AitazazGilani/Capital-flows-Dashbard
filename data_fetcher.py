@@ -10,7 +10,10 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 from datetime import datetime, timedelta
-from config import COUNTRIES, MARKET_TICKERS, FRED, WB_INDICATORS
+from config import (
+    COUNTRIES, MARKET_TICKERS, FRED, WB_INDICATORS,
+    SEMI_TICKERS, SEMI_ETFS, SEMI_COMMODITIES, POLICY_CATEGORIES,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -370,3 +373,230 @@ def get_fed_funds_futures() -> pd.DataFrame:
         "implied_rate": implied_rates,
         "cuts_priced": cuts_priced,
     })
+
+
+# ---------------------------------------------------------------------------
+# Semiconductor / Strategic Sector Data
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=900)
+def get_semi_stocks(period: str = "5y") -> pd.DataFrame:
+    """Get semiconductor stock prices (Close) for all tracked tickers."""
+    idx = _date_index(1825)
+    n = len(idx)
+    seed_map = {
+        "^SOX": (3800, 300), "NVDA": (480, 301), "TSM": (105, 302),
+        "ASML": (680, 303), "AMD": (120, 304), "INTC": (35, 305),
+        "AVGO": (900, 306), "QCOM": (145, 307), "MU": (80, 308),
+        "LRCX": (680, 309), "AMAT": (160, 310),
+    }
+    data = {}
+    for label, ticker in SEMI_TICKERS.items():
+        start_price, seed = seed_map.get(ticker, (100, 399))
+        # Semis are high-vol, high-drift
+        data[label] = _random_walk(start_price, drift=0.0005, vol=0.02, n=n, seed=seed)
+    return pd.DataFrame(data, index=idx)
+
+
+@st.cache_data(ttl=900)
+def get_semi_etfs(period: str = "5y") -> pd.DataFrame:
+    """Get semiconductor ETF prices."""
+    idx = _date_index(1825)
+    n = len(idx)
+    data = {
+        "SMH (VanEck Semi ETF)": _random_walk(220, drift=0.0005, vol=0.018, n=n, seed=320),
+        "SOXX (iShares Semi ETF)": _random_walk(480, drift=0.0005, vol=0.018, n=n, seed=321),
+    }
+    return pd.DataFrame(data, index=idx)
+
+
+@st.cache_data(ttl=900)
+def get_semi_vs_market(period: str = "5y") -> pd.DataFrame:
+    """SOX index vs S&P 500 for relative performance."""
+    idx = _date_index(1825)
+    n = len(idx)
+    return pd.DataFrame({
+        "SOX (Semis)": _random_walk(3800, drift=0.0005, vol=0.02, n=n, seed=300),
+        "S&P 500": _random_walk(4200, drift=0.0003, vol=0.012, n=n, seed=42),
+    }, index=idx)
+
+
+@st.cache_data(ttl=86400)
+def get_semi_revenue_cycle() -> pd.DataFrame:
+    """Mock global semiconductor revenue cycle data (quarterly, $B).
+    In production: source from SIA (Semiconductor Industry Association) — free quarterly reports.
+    API: https://www.semiconductors.org/global-semiconductor-sales — no key needed, scrape PDF/HTML.
+    """
+    quarters = pd.date_range(start="2020-01-01", end="2026-01-01", freq="QS")
+    n = len(quarters)
+    rng = np.random.RandomState(350)
+    # Simulate the boom-bust-recovery cycle
+    base = 120  # ~$120B/quarter baseline
+    cycle = base + 30 * np.sin(np.linspace(0, 3 * np.pi, n)) + np.cumsum(rng.normal(1, 3, n))
+    return pd.DataFrame({
+        "Global Semi Revenue ($B)": cycle,
+        "QoQ Change (%)": np.concatenate([[0], np.diff(cycle) / cycle[:-1] * 100]),
+    }, index=quarters)
+
+
+@st.cache_data(ttl=86400)
+def get_semi_inventory_cycle() -> pd.DataFrame:
+    """Mock semiconductor inventory/book-to-bill data.
+    In production: SIA monthly book-to-bill ratio — published free, scrape from site.
+    """
+    months = pd.date_range(start="2022-01-01", end="2026-02-01", freq="MS")
+    n = len(months)
+    rng = np.random.RandomState(351)
+    # Book-to-bill oscillates around 1.0 (>1 = expanding, <1 = contracting)
+    btb = _mean_reverting(1.0, vol=0.04, n=n, seed=351)
+    btb = np.clip(btb, 0.7, 1.4)
+    # Inventory days — higher = glut
+    inv_days = _mean_reverting(95, vol=4, n=n, seed=352)
+    return pd.DataFrame({
+        "Book-to-Bill": btb,
+        "Inventory Days": inv_days,
+    }, index=months)
+
+
+# ---------------------------------------------------------------------------
+# Policy & Geopolitical Events
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=3600)
+def get_policy_events() -> pd.DataFrame:
+    """Curated macro-relevant policy events.
+    In production, source from:
+    - Federal Register API (free, no key): https://www.federalregister.gov/developers/documentation/api/v1
+    - GovInfo API (free, key required): https://api.govinfo.gov — US legislation
+    - GDELT Project (free, no key): https://www.gdeltproject.org — global events
+    - ProPublica Congress API (free, key required): https://projects.propublica.org/api-docs/congress-api/
+    - Trade.gov (free, no key): https://developer.trade.gov — tariff/trade data
+    For now, returns a curated mock timeline of real-world-style events.
+    """
+    events = [
+        # 2025-2026 realistic policy events
+        {"date": "2025-01-15", "category": "Trade & Tariffs",
+         "country": "US", "event": "US raises Section 301 tariffs on Chinese EVs to 100%, semiconductors to 50%",
+         "impact": "Negative", "sectors": "Autos, Semiconductors",
+         "detail": "Effective Q2 2025. Targets $18B in imports. China signals retaliation on US agricultural exports."},
+        {"date": "2025-02-01", "category": "Central Bank Policy",
+         "country": "US", "event": "FOMC holds rates at 5.25-5.50%, signals patience on cuts",
+         "impact": "Neutral", "sectors": "Broad Market",
+         "detail": "Dot plot shows 2 cuts in 2025 vs market pricing of 4-5. USD strengthens on hawkish hold."},
+        {"date": "2025-02-20", "category": "Export Controls & Sanctions",
+         "country": "US", "event": "Commerce Dept expands AI chip export controls to include ASML DUV tools",
+         "impact": "Negative", "sectors": "Semiconductors, AI",
+         "detail": "New rule requires licenses for DUV lithography exports to China. ASML, LRCX, AMAT affected."},
+        {"date": "2025-03-10", "category": "Industrial Policy & Subsidies",
+         "country": "CN", "event": "China announces $47B 'Big Fund III' for domestic semiconductor capacity",
+         "impact": "Mixed", "sectors": "Semiconductors",
+         "detail": "Third phase of national IC fund. Focus on mature-node fabs and packaging. Negative for global ASPs."},
+        {"date": "2025-03-15", "category": "Central Bank Policy",
+         "country": "JP", "event": "BOJ raises policy rate to 0.50%, signals further normalization",
+         "impact": "Mixed", "sectors": "FX, Bonds",
+         "detail": "Yen strengthens 3% on surprise hawkish shift. Carry trade unwind risk rises."},
+        {"date": "2025-04-01", "category": "Trade & Tariffs",
+         "country": "US", "event": "US imposes 25% tariffs on steel/aluminum from all countries",
+         "impact": "Negative", "sectors": "Industrials, Construction",
+         "detail": "Universal tariff replaces country-specific exemptions. EU, Japan, Canada announce retaliatory measures."},
+        {"date": "2025-04-20", "category": "Industrial Policy & Subsidies",
+         "country": "US", "event": "CHIPS Act Phase 2: $8B disbursed to Intel, Samsung US fabs",
+         "impact": "Positive", "sectors": "Semiconductors",
+         "detail": "Intel Arizona fab gets $5B, Samsung Taylor TX gets $3B. Production expected 2027."},
+        {"date": "2025-05-10", "category": "Capital Controls",
+         "country": "CN", "event": "PBOC tightens offshore yuan lending to defend CNY",
+         "impact": "Mixed", "sectors": "FX, EM",
+         "detail": "Squeeze on CNH short positions. Signal of capital outflow pressure."},
+        {"date": "2025-06-15", "category": "Central Bank Policy",
+         "country": "EU", "event": "ECB cuts deposit rate by 25bp to 4.25%, signals data-dependent path",
+         "impact": "Positive", "sectors": "EU Equities, Bonds",
+         "detail": "First cut of the cycle. EUR weakens modestly. EU bank stocks rally."},
+        {"date": "2025-07-01", "category": "Regulatory Change",
+         "country": "EU", "event": "EU Carbon Border Adjustment Mechanism (CBAM) full implementation",
+         "impact": "Mixed", "sectors": "Industrials, Energy, Materials",
+         "detail": "Carbon tariffs on steel, cement, aluminum, fertilizers, electricity imports. Increases costs for non-EU exporters."},
+        {"date": "2025-08-05", "category": "Geopolitical Event",
+         "country": "CN", "event": "China conducts large-scale military exercises near Taiwan Strait",
+         "impact": "Negative", "sectors": "Semiconductors, Defense, Shipping",
+         "detail": "Week-long exercises. TSM stock drops 8%. Shipping insurance rates for Taiwan Strait triple."},
+        {"date": "2025-09-01", "category": "Trade & Tariffs",
+         "country": "CN", "event": "China restricts export of gallium, germanium, and antimony",
+         "impact": "Negative", "sectors": "Semiconductors, Defense",
+         "detail": "Critical minerals export permits required. Affects chip substrates and military applications."},
+        {"date": "2025-09-20", "category": "Central Bank Policy",
+         "country": "US", "event": "Fed cuts rates by 25bp to 5.00-5.25%, first cut of the cycle",
+         "impact": "Positive", "sectors": "Broad Market",
+         "detail": "Markets rally. Forward guidance suggests gradual easing. DXY drops 1.5%."},
+        {"date": "2025-10-15", "category": "Industrial Policy & Subsidies",
+         "country": "US", "event": "Inflation Reduction Act: $4.5B in new clean energy tax credit allocations",
+         "impact": "Positive", "sectors": "Clean Energy, EVs, Utilities",
+         "detail": "Focus on battery manufacturing, solar panel production, EV charging infrastructure."},
+        {"date": "2025-11-01", "category": "Export Controls & Sanctions",
+         "country": "US", "event": "US Treasury designates 15 Chinese entities under Russia-related sanctions",
+         "impact": "Negative", "sectors": "Banks, Trade Finance",
+         "detail": "Targets Chinese banks facilitating Russian commodity trade. USDCNY weakens."},
+        {"date": "2025-12-10", "category": "Central Bank Policy",
+         "country": "US", "event": "Fed cuts rates by 25bp to 4.75-5.00%, signals 3 more cuts in 2026",
+         "impact": "Positive", "sectors": "Broad Market, Real Estate",
+         "detail": "Dovish dot plot. 10Y yield drops to 3.9%. REIT sector surges 5%."},
+        {"date": "2026-01-05", "category": "Trade & Tariffs",
+         "country": "US", "event": "New administration announces 60% tariff proposal on all Chinese goods",
+         "impact": "Negative", "sectors": "Consumer, Tech, Industrials",
+         "detail": "Phase-in over 2026. Markets sell off 3%. Supply chain diversification accelerates."},
+        {"date": "2026-01-20", "category": "Geopolitical Event",
+         "country": "US", "event": "US executive orders on energy, trade, and immigration on day one",
+         "impact": "Mixed", "sectors": "Energy, Industrials, Agriculture",
+         "detail": "Paris Agreement withdrawal, Keystone XL restart, border emergency. Oil stocks rally, clean energy sells off."},
+        {"date": "2026-02-01", "category": "Central Bank Policy",
+         "country": "US", "event": "FOMC pauses rate cuts at 4.75-5.00%, cites tariff inflation risks",
+         "impact": "Negative", "sectors": "Broad Market",
+         "detail": "Hawkish pause. Market reprices terminal rate higher. 2Y yield jumps 15bp."},
+        {"date": "2026-02-05", "category": "Export Controls & Sanctions",
+         "country": "US", "event": "Commerce Dept proposes 'know your customer' rule for cloud AI compute",
+         "impact": "Mixed", "sectors": "Cloud, AI, Semiconductors",
+         "detail": "Would require cloud providers to verify end-users of AI training workloads. Targets China access to US AI infrastructure."},
+    ]
+    df = pd.DataFrame(events)
+    df["date"] = pd.to_datetime(df["date"])
+    return df.sort_values("date", ascending=False).reset_index(drop=True)
+
+
+@st.cache_data(ttl=86400)
+def get_central_bank_calendar() -> pd.DataFrame:
+    """Upcoming central bank meeting dates and expectations.
+    In production: scrape from central bank websites (all free, no key).
+    """
+    meetings = [
+        {"date": "2026-02-05", "bank": "RBA", "country": "AU", "current_rate": 4.35, "expected_action": "Hold", "market_probability": "85% hold"},
+        {"date": "2026-03-06", "bank": "ECB", "country": "EU", "current_rate": 4.00, "expected_action": "Cut 25bp", "market_probability": "70% cut"},
+        {"date": "2026-03-14", "bank": "BOJ", "country": "JP", "current_rate": 0.50, "expected_action": "Hold", "market_probability": "90% hold"},
+        {"date": "2026-03-19", "bank": "FOMC", "country": "US", "current_rate": 4.875, "expected_action": "Hold", "market_probability": "80% hold"},
+        {"date": "2026-03-20", "bank": "BOE", "country": "UK", "current_rate": 5.00, "expected_action": "Hold", "market_probability": "75% hold"},
+        {"date": "2026-04-17", "bank": "ECB", "country": "EU", "current_rate": 4.00, "expected_action": "Cut 25bp", "market_probability": "60% cut"},
+        {"date": "2026-05-07", "bank": "FOMC", "country": "US", "current_rate": 4.875, "expected_action": "Cut 25bp", "market_probability": "55% cut"},
+        {"date": "2026-05-08", "bank": "BOE", "country": "UK", "current_rate": 5.00, "expected_action": "Cut 25bp", "market_probability": "65% cut"},
+        {"date": "2026-06-05", "bank": "ECB", "country": "EU", "current_rate": 3.75, "expected_action": "Hold", "market_probability": "70% hold"},
+        {"date": "2026-06-18", "bank": "FOMC", "country": "US", "current_rate": 4.625, "expected_action": "Cut 25bp", "market_probability": "60% cut"},
+    ]
+    df = pd.DataFrame(meetings)
+    df["date"] = pd.to_datetime(df["date"])
+    return df.sort_values("date").reset_index(drop=True)
+
+
+@st.cache_data(ttl=86400)
+def get_tariff_tracker() -> pd.DataFrame:
+    """Track current effective tariff rates between major trading partners.
+    In production: Trade.gov API (free, no key) or WTO tariff data.
+    """
+    data = {
+        "Target": ["China", "China", "EU", "Japan", "Canada", "Mexico", "S. Korea", "India", "China", "All"],
+        "Sector": ["Semiconductors", "EVs & Batteries", "Steel & Aluminum", "Autos", "Steel & Aluminum",
+                    "Autos (pending)", "Steel", "Electronics", "Consumer Goods", "Baseline MFN"],
+        "US Tariff Rate (%)": [50, 100, 25, 2.5, 25, 25, 25, 3.5, 25, 3.4],
+        "Pre-2025 Rate (%)": [25, 27.5, 0, 2.5, 0, 0, 0, 3.5, 7.5, 3.4],
+        "Effective Date": ["2025-06-01", "2025-06-01", "2025-04-01", "Unchanged", "2025-04-01",
+                          "Proposed", "2025-04-01", "Unchanged", "2025-01-15", "N/A"],
+        "Retaliation": ["Yes - Ag", "Yes - Ag", "Yes - Bourbon, Harley", "None", "Yes - Dairy",
+                        "TBD", "None", "None", "Yes - LNG", "N/A"],
+    }
+    return pd.DataFrame(data)

@@ -48,6 +48,21 @@ SUGGESTED_PROMPTS = {
         "Is sentiment at a contrarian extreme?",
         "What does the VIX term structure imply?",
     ],
+    "Cross-Asset Signals": [
+        "Which countries offer the best risk-reward right now?",
+        "Where is carry trade most attractive and most dangerous?",
+        "What does the relative value matrix say about EM vs DM?",
+    ],
+    "Policy Tracker": [
+        "What are the biggest policy catalysts in the next 3 months?",
+        "How do tariff escalations affect capital flows?",
+        "Which central bank decisions will surprise the market?",
+    ],
+    "Strategic Sectors": [
+        "Where are we in the semiconductor cycle?",
+        "Is SOX relative strength signaling broader market direction?",
+        "How do export controls reshape the semi supply chain?",
+    ],
 }
 
 
@@ -62,7 +77,8 @@ def build_context() -> str:
 
     # Add summary data if available in session state
     for key in ["market_summary", "liquidity_summary", "rates_summary",
-                "economy_summary", "flows_summary", "risk_summary", "sentiment_summary"]:
+                "economy_summary", "flows_summary", "risk_summary", "sentiment_summary",
+                "cross_asset_summary", "policy_summary", "semi_summary"]:
         if key in st.session_state:
             context[key] = st.session_state[key]
 
@@ -175,6 +191,58 @@ def _mock_response(user_message: str, context: str) -> str:
                 "but the signal has been muddied by post-COVID distortions. Watch for claims "
                 "breaking above their 4-week MA trend — that would be the first concrete "
                 "recession signal.")
+
+    elif "carry" in msg_lower or "relative value" in msg_lower or "erp" in msg_lower:
+        return ("The relative value matrix currently favors high-yielding EM markets (Brazil, Mexico, "
+                "India) on a carry basis — rate differentials of 5-6% over the US are attractive. However, "
+                "carry trades are vulnerable to sudden unwinds, especially if the Fed pauses cuts. The "
+                "biggest risk is the JPY carry trade — if BOJ continues normalizing, a rapid yen "
+                "appreciation could trigger forced deleveraging across global risk assets. On equity "
+                "risk premium, China and Korea screen as cheapest (P/E < 11), but low ERP alone isn't "
+                "enough — you need positive flow signals to confirm.")
+
+    elif "tariff" in msg_lower or "trade war" in msg_lower or "policy" in msg_lower or "catalyst" in msg_lower:
+        return ("The policy environment is the dominant macro catalyst right now. Key catalysts "
+                "to watch in the next 90 days:\n\n"
+                "1. **US tariff implementation**: 60% China tariff proposal is the single largest "
+                "risk to global trade. Phase-in schedule will determine market impact.\n"
+                "2. **FOMC March meeting**: Market expects hold, but forward guidance on tariff "
+                "inflation will set the tone for H1 rate expectations.\n"
+                "3. **ECB March cut**: Most consensus event — priced in. Surprise would be a hold.\n"
+                "4. **China policy response**: Watch for RRR cuts, property stimulus, or CNY "
+                "management signals in response to tariff pressure.\n\n"
+                "Net policy bias is bearish over 90 days due to tariff escalation, but central "
+                "bank easing provides a partial offset.")
+
+    elif "semi" in msg_lower or "chip" in msg_lower or "semiconductor" in msg_lower:
+        return ("The semiconductor cycle is in a critical phase. Key observations:\n\n"
+                "1. **Cycle position**: Book-to-bill is near 1.0, suggesting we're transitioning "
+                "from correction to early recovery. Inventory days are normalizing.\n"
+                "2. **SOX relative strength** has been improving — semis tend to lead the market "
+                "by 2-3 months, so this is a positive signal for broader equities.\n"
+                "3. **AI capex** remains the dominant driver — NVDA, AVGO, and TSM are benefiting "
+                "from hyperscaler spending, masking weakness in traditional end markets.\n"
+                "4. **Policy overlay**: US export controls continue to bifurcate the market. "
+                "Long US/allied equipment makers, cautious on China-exposed revenue.\n"
+                "5. **Biggest risk**: Taiwan Strait tensions — any escalation would disrupt "
+                "~60% of global leading-edge chip production.")
+
+    elif "where" in msg_lower and ("invest" in msg_lower or "allocat" in msg_lower or "money" in msg_lower):
+        return ("Based on the cross-asset signal synthesis, here's the current macro picture "
+                "for allocation decisions (analysis, not advice):\n\n"
+                "**Attractive on relative value:**\n"
+                "- EM with high carry (Brazil, India) — but size positions for unwind risk\n"
+                "- Value markets with positive flow signals (Korea if tech cycle confirms)\n\n"
+                "**Neutral/Benchmark:**\n"
+                "- US equities: expensive on ERP but strongest flow support and liquidity\n"
+                "- EU: ECB cutting, but tariff exposure and growth concerns\n\n"
+                "**Caution:**\n"
+                "- China: cheap but capital outflow signals persist\n"
+                "- Japan: BOJ normalization creates carry unwind risk\n\n"
+                "**Key catalysts to watch:**\n"
+                "- Tariff implementation timeline (biggest single variable)\n"
+                "- FOMC forward guidance on tariff-driven inflation\n"
+                "- Semi cycle inflection (early indicator for risk appetite)")
 
     else:
         return (f"Based on the current dashboard data for "

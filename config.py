@@ -88,3 +88,56 @@ YF_PERIOD_MAP = {
     "1M": "1mo", "3M": "3mo", "6M": "6mo", "1Y": "1y",
     "3Y": "3y", "5Y": "5y", "10Y": "10y", "MAX": "max",
 }
+
+# -- Semiconductor / Strategic Sector Tickers (yfinance) --
+SEMI_TICKERS = {
+    "SOX (Semis Index)": "^SOX",
+    "NVDA": "NVDA",
+    "TSM": "TSM",
+    "ASML": "ASML",
+    "AMD": "AMD",
+    "INTC": "INTC",
+    "AVGO": "AVGO",
+    "QCOM": "QCOM",
+    "MU": "MU",
+    "LRCX": "LRCX",
+    "AMAT": "AMAT",
+}
+
+SEMI_ETFS = {
+    "SMH (VanEck Semi ETF)": "SMH",
+    "SOXX (iShares Semi ETF)": "SOXX",
+}
+
+# Key semi supply chain commodities / inputs
+SEMI_COMMODITIES = {
+    "Silicon Metal": "SI=F",      # CME silicon futures proxy
+    "Palladium": "PA=F",
+    "Platinum": "PL=F",
+    "Natural Gas": "NG=F",        # fab energy costs
+}
+
+# -- Policy event categories --
+POLICY_CATEGORIES = [
+    "Trade & Tariffs",
+    "Export Controls & Sanctions",
+    "Central Bank Policy",
+    "Industrial Policy & Subsidies",
+    "Capital Controls",
+    "Regulatory Change",
+    "Geopolitical Event",
+]
+
+# -- Carry trade reference: approximate policy rates by country (for live data, source from FRED/central banks) --
+POLICY_RATES = {
+    "US": 5.33, "EU": 4.50, "UK": 5.25, "JP": 0.10, "CN": 3.45,
+    "CA": 5.00, "AU": 4.35, "CH": 1.75, "KR": 3.50, "IN": 6.50,
+    "BR": 11.75, "MX": 11.25, "DE": 4.50,
+}
+
+# -- Earnings yield proxies (trailing P/E inverses for equity risk premium) --
+COUNTRY_PE_ESTIMATES = {
+    "US": 22.5, "EU": 13.5, "UK": 11.0, "JP": 15.0, "CN": 10.5,
+    "CA": 14.0, "AU": 16.0, "CH": 19.0, "KR": 10.0, "IN": 22.0,
+    "BR": 8.0, "MX": 12.0, "DE": 12.5,
+}
