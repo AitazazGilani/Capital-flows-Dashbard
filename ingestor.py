@@ -45,16 +45,20 @@ from src.config import (
 
 DATA_DIR = Path(__file__).parent / "data"
 MANIFEST_FILE = DATA_DIR / "manifest.json"
+RATE_LIMIT_FILE = DATA_DIR / "rate_limits.json"
 SOURCES = ["fred", "world_bank", "market", "imf", "semi", "policy"]
+
+# Historical data start date
+HIST_START = datetime(2020, 1, 1)
 
 
 # ---------------------------------------------------------------------------
 # Mock data helpers (same generators as data_fetcher.py, no Streamlit dep)
 # ---------------------------------------------------------------------------
 
-def _date_index(days=1825):
+def _date_index(days=None):
     end = datetime(2026, 2, 6)
-    start = end - timedelta(days=days)
+    start = HIST_START if days is None else end - timedelta(days=days)
     return pd.bdate_range(start=start, end=end)
 
 
@@ -119,6 +123,45 @@ def _update_manifest(manifest: dict, category: str, name: str,
 
 
 # ---------------------------------------------------------------------------
+# Rate limit tracking
+# ---------------------------------------------------------------------------
+
+def _load_rate_limits() -> dict:
+    if RATE_LIMIT_FILE.exists():
+        with open(RATE_LIMIT_FILE) as f:
+            return json.load(f)
+    return {}
+
+
+def _save_rate_limits(limits: dict):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(RATE_LIMIT_FILE, "w") as f:
+        json.dump(limits, f, indent=2, default=str)
+
+
+def _record_rate_limit(limits: dict, source: str, item: str, error: str,
+                       last_date: str = None):
+    """Record a rate limit hit so ingestion can resume later."""
+    key = f"{source}/{item}"
+    limits[key] = {
+        "source": source,
+        "item": item,
+        "error": str(error),
+        "last_date_ingested": last_date,
+        "hit_at": datetime.now().isoformat(),
+        "status": "rate_limited",
+    }
+
+
+def _is_rate_limit_error(error: Exception) -> bool:
+    """Check if an exception looks like a rate limit error."""
+    err_str = str(error).lower()
+    rate_limit_signals = ["429", "rate limit", "too many requests", "throttl",
+                          "quota exceeded", "limit exceeded"]
+    return any(s in err_str for s in rate_limit_signals)
+
+
+# ---------------------------------------------------------------------------
 # Parquet I/O
 # ---------------------------------------------------------------------------
 
@@ -145,7 +188,7 @@ def _load_existing_parquet(category: str, name: str) -> pd.DataFrame | None:
 # Source: FRED
 # ---------------------------------------------------------------------------
 
-def ingest_fred(manifest: dict, incremental: bool = False):
+def ingest_fred(manifest: dict, incremental: bool = False, rate_limits: dict = None):
     """Ingest all FRED series."""
     print("\n[FRED] Ingesting US macro series...")
     fred_key = os.getenv("FRED_API_KEY")
@@ -182,7 +225,7 @@ def ingest_fred(manifest: dict, incremental: bool = False):
             df = None
             if fred_client:
                 try:
-                    start = "2000-01-01"
+                    start = "2020-01-01"
                     if incremental:
                         existing = _load_existing_parquet("fred", series_id)
                         if existing is not None and len(existing) > 0:
@@ -194,12 +237,18 @@ def ingest_fred(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "fred", series_id, str(api_err))
+                        print(f"  RATE LIMIT {label} ({series_id}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return ok, fail
                     print(f"  WARN {label} ({series_id}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
                 # --- Mock data ---
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 center, vol, seed = mock_params.get(series_id, (100, 1, 199))
                 values = _mean_reverting(center, vol=vol, n=n, seed=seed)
@@ -230,7 +279,7 @@ def ingest_fred(manifest: dict, incremental: bool = False):
 # Source: World Bank
 # ---------------------------------------------------------------------------
 
-def ingest_world_bank(manifest: dict, incremental: bool = False):
+def ingest_world_bank(manifest: dict, incremental: bool = False, rate_limits: dict = None):
     """Ingest World Bank indicators for all tracked countries."""
     print("\n[World Bank] Ingesting international indicators...")
 
@@ -288,18 +337,24 @@ def ingest_world_bank(manifest: dict, incremental: bool = False):
             df = None
             if wb_available:
                 try:
-                    raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2000, 2026))
+                    raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2020, 2026))
                     df = raw.T
                     df.index = df.index.astype(int)
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "world_bank", ind_code, str(api_err))
+                        print(f"  RATE LIMIT {ind_name} ({ind_code}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return ok, fail
                     print(f"  WARN {ind_name} ({ind_code}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
                 # --- Mock data ---
-                years = list(range(2000, 2026))
+                years = list(range(2020, 2026))
                 rng = np.random.RandomState(hash(ind_code) % 2**31)
                 defaults = base_values.get(ind_code, {})
                 data = {}
@@ -331,7 +386,7 @@ def ingest_world_bank(manifest: dict, incremental: bool = False):
 # Source: Market (yfinance — equity indices, FX, commodities, volatility)
 # ---------------------------------------------------------------------------
 
-def ingest_market(manifest: dict, incremental: bool = False):
+def ingest_market(manifest: dict, incremental: bool = False, rate_limits: dict = None):
     """Ingest market price history — equity indices, FX, commodities, volatility, DXY."""
     print("\n[Market] Ingesting market price history...")
 
@@ -363,12 +418,18 @@ def ingest_market(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "market", ticker, str(api_err))
+                        print(f"  RATE LIMIT {code} ({ticker}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return
                     print(f"  WARN {code} ({ticker}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
                 start_price, seed = index_seeds.get(ticker, (1000, 99))
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 close = _random_walk(start_price, drift=0.0003, vol=0.012, n=n, seed=seed)
                 rng = np.random.RandomState(seed)
@@ -408,12 +469,18 @@ def ingest_market(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "market", pair, str(api_err))
+                        print(f"  RATE LIMIT {code} FX ({pair}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return
                     print(f"  WARN {code} FX ({pair}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
                 start_price, seed = fx_seeds.get(pair, (1.0, 99))
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 close = _random_walk(start_price, drift=0.0001, vol=0.005, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
@@ -435,11 +502,17 @@ def ingest_market(manifest: dict, incremental: bool = False):
                 if df is None or df.empty:
                     df = None
             except Exception as api_err:
+                if _is_rate_limit_error(api_err) and rate_limits is not None:
+                    _record_rate_limit(rate_limits, "market", "DXY", str(api_err))
+                    print(f"  RATE LIMIT DXY: {api_err}")
+                    _save_rate_limits(rate_limits)
+                    print(f"  Rate limit saved. Moving to next source...")
+                    return
                 print(f"  WARN DXY: API failed ({api_err}), using mock")
                 df = None
 
         if df is None:
-            idx = _date_index(1825)
+            idx = _date_index()
             n = len(idx)
             close = _random_walk(104, drift=0.0001, vol=0.004, n=n, seed=100)
             df = pd.DataFrame({"Close": close}, index=idx)
@@ -468,11 +541,17 @@ def ingest_market(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "market", ticker, str(api_err))
+                        print(f"  RATE LIMIT {name} ({ticker}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return
                     print(f"  WARN {name} ({ticker}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 close = _random_walk(start_p, drift=drift, vol=vol, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
@@ -496,11 +575,17 @@ def ingest_market(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "market", ticker, str(api_err))
+                        print(f"  RATE LIMIT {name} ({ticker}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return
                     print(f"  WARN {name} ({ticker}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 low, high = (9, 80) if name == "VIX" else (50, 200)
                 close = np.clip(_mean_reverting(center, vol=vol_param, n=n, seed=seed), low, high)
@@ -520,7 +605,7 @@ def ingest_market(manifest: dict, incremental: bool = False):
 # Source: IMF (Balance of Payments, Gold Reserves)
 # ---------------------------------------------------------------------------
 
-def ingest_imf(manifest: dict, incremental: bool = False):
+def ingest_imf(manifest: dict, incremental: bool = False, rate_limits: dict = None):
     """Ingest IMF BOP and gold reserve data."""
     print("\n[IMF] Ingesting balance of payments and gold reserves...")
     print("  Using mock data (IMF API is flaky; swap when needed)")
@@ -533,7 +618,7 @@ def ingest_imf(manifest: dict, incremental: bool = False):
                  "CA": 0, "AU": 80, "CH": 1040, "KR": 104, "IN": 800,
                  "BR": 130, "MX": 120, "DE": 3355}
 
-    years = list(range(2005, 2026))
+    years = list(range(2020, 2026))
 
     # --- BOP ---
     print("  -- Balance of Payments --")
@@ -568,7 +653,7 @@ def ingest_imf(manifest: dict, incremental: bool = False):
 # Source: Semiconductor sector
 # ---------------------------------------------------------------------------
 
-def ingest_semi(manifest: dict, incremental: bool = False):
+def ingest_semi(manifest: dict, incremental: bool = False, rate_limits: dict = None):
     """Ingest semiconductor stock history, ETFs, revenue and inventory cycles."""
     print("\n[Semi] Ingesting semiconductor sector data...")
 
@@ -597,12 +682,18 @@ def ingest_semi(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "semi", ticker, str(api_err))
+                        print(f"  RATE LIMIT {label} ({ticker}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return
                     print(f"  WARN {label} ({ticker}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
                 start_price, seed = seed_map.get(ticker, (100, 399))
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 close = _random_walk(start_price, drift=0.0005, vol=0.02, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
@@ -626,12 +717,18 @@ def ingest_semi(manifest: dict, incremental: bool = False):
                     if df is None or df.empty:
                         df = None
                 except Exception as api_err:
+                    if _is_rate_limit_error(api_err) and rate_limits is not None:
+                        _record_rate_limit(rate_limits, "semi", ticker, str(api_err))
+                        print(f"  RATE LIMIT {label} ({ticker}): {api_err}")
+                        _save_rate_limits(rate_limits)
+                        print(f"  Rate limit saved. Moving to next source...")
+                        return
                     print(f"  WARN {label} ({ticker}): API failed ({api_err}), using mock")
                     df = None
 
             if df is None:
                 start_price, seed = etf_seeds.get(ticker, (100, 399))
-                idx = _date_index(1825)
+                idx = _date_index()
                 n = len(idx)
                 close = _random_walk(start_price, drift=0.0005, vol=0.018, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
@@ -679,7 +776,7 @@ def ingest_semi(manifest: dict, incremental: bool = False):
 # Source: Policy & Geopolitical Events
 # ---------------------------------------------------------------------------
 
-def ingest_policy(manifest: dict, incremental: bool = False):
+def ingest_policy(manifest: dict, incremental: bool = False, rate_limits: dict = None):
     """Ingest policy events, central bank calendar, tariff tracker."""
     print("\n[Policy] Ingesting policy and geopolitical data...")
     print("  Using curated mock data (swap for Federal Register / GDELT APIs)")
@@ -932,23 +1029,34 @@ Examples:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     manifest = _load_manifest()
+    rate_limits = _load_rate_limits()
     incremental = args.update
 
     start_time = datetime.now()
     print(f"Macro Dashboard Ingestor — {'Incremental' if incremental else 'Full'} run")
     print(f"Started: {start_time.isoformat()}")
     print(f"Data directory: {DATA_DIR.resolve()}")
+    print(f"Historical start: {HIST_START.date()}")
 
     if args.source:
         # Single source
         func = SOURCE_FUNCTIONS[args.source]
-        func(manifest, incremental=incremental)
+        func(manifest, incremental=incremental, rate_limits=rate_limits)
     else:
-        # All sources
+        # All sources — if one hits a rate limit, save and continue to next
         for name, func in SOURCE_FUNCTIONS.items():
-            func(manifest, incremental=incremental)
+            try:
+                func(manifest, incremental=incremental, rate_limits=rate_limits)
+            except Exception as e:
+                print(f"\n  SOURCE ERROR [{name}]: {e}")
+                _record_rate_limit(rate_limits, name, "ALL", str(e))
+                print(f"  Recorded rate limit, moving to next source...")
 
     _save_manifest(manifest)
+    if rate_limits:
+        _save_rate_limits(rate_limits)
+        print(f"Rate limits saved to {RATE_LIMIT_FILE}")
+        print(f"  {len(rate_limits)} item(s) hit rate limits — re-run to resume")
 
     elapsed = (datetime.now() - start_time).total_seconds()
     ok_count = sum(1 for v in manifest.values() if v.get("status") == "ok")
