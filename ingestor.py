@@ -179,18 +179,25 @@ def ingest_fred(manifest: dict, incremental: bool = False):
     ok, fail = 0, 0
     for label, series_id in FRED.items():
         try:
+            df = None
             if fred_client:
-                # --- Live API ---
-                start = "2000-01-01"
-                if incremental:
-                    existing = _load_existing_parquet("fred", series_id)
-                    if existing is not None and len(existing) > 0:
-                        start = str(existing.index.max().date())
-                data = fred_client.get_series(series_id, observation_start=start)
-                df = data.to_frame(name="value")
-                if incremental and existing is not None:
-                    df = pd.concat([existing, df]).loc[~pd.concat([existing, df]).index.duplicated(keep="last")]
-            else:
+                try:
+                    start = "2000-01-01"
+                    if incremental:
+                        existing = _load_existing_parquet("fred", series_id)
+                        if existing is not None and len(existing) > 0:
+                            start = str(existing.index.max().date())
+                    data = fred_client.get_series(series_id, observation_start=start)
+                    df = data.to_frame(name="value")
+                    if incremental and existing is not None:
+                        df = pd.concat([existing, df]).loc[~pd.concat([existing, df]).index.duplicated(keep="last")]
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {label} ({series_id}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 # --- Mock data ---
                 idx = _date_index(1825)
                 n = len(idx)
@@ -278,12 +285,19 @@ def ingest_world_bank(manifest: dict, incremental: bool = False):
     ok, fail = 0, 0
     for ind_name, ind_code in WB_INDICATORS.items():
         try:
+            df = None
             if wb_available:
-                # --- Live API ---
-                raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2000, 2026))
-                df = raw.T
-                df.index = df.index.astype(int)
-            else:
+                try:
+                    raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2000, 2026))
+                    df = raw.T
+                    df.index = df.index.astype(int)
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {ind_name} ({ind_code}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 # --- Mock data ---
                 years = list(range(2000, 2026))
                 rng = np.random.RandomState(hash(ind_code) % 2**31)
@@ -341,12 +355,18 @@ def ingest_market(manifest: dict, incremental: bool = False):
     for code, meta in COUNTRIES.items():
         ticker = meta["index"]
         try:
+            df = None
             if yf_available:
-                obj = yf.Ticker(ticker)
-                df = obj.history(period="5y")
-                if df.empty:
-                    raise ValueError("No data returned from yfinance")
-            else:
+                try:
+                    obj = yf.Ticker(ticker)
+                    df = obj.history(period="5y")
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {code} ({ticker}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 start_price, seed = index_seeds.get(ticker, (1000, 99))
                 idx = _date_index(1825)
                 n = len(idx)
@@ -380,12 +400,18 @@ def ingest_market(manifest: dict, incremental: bool = False):
         if not pair:
             continue
         try:
+            df = None
             if yf_available:
-                obj = yf.Ticker(pair)
-                df = obj.history(period="5y")
-                if df.empty:
-                    raise ValueError("No data returned")
-            else:
+                try:
+                    obj = yf.Ticker(pair)
+                    df = obj.history(period="5y")
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {code} FX ({pair}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 start_price, seed = fx_seeds.get(pair, (1.0, 99))
                 idx = _date_index(1825)
                 n = len(idx)
@@ -402,15 +428,22 @@ def ingest_market(manifest: dict, incremental: bool = False):
     # --- DXY ---
     print("  -- DXY --")
     try:
+        df = None
         if yf_available:
-            df = yf.Ticker("DX-Y.NYB").history(period="5y")
-            if df.empty:
-                raise ValueError("No data returned")
-        else:
+            try:
+                df = yf.Ticker("DX-Y.NYB").history(period="5y")
+                if df is None or df.empty:
+                    df = None
+            except Exception as api_err:
+                print(f"  WARN DXY: API failed ({api_err}), using mock")
+                df = None
+
+        if df is None:
             idx = _date_index(1825)
             n = len(idx)
             close = _random_walk(104, drift=0.0001, vol=0.004, n=n, seed=100)
             df = pd.DataFrame({"Close": close}, index=idx)
+
         _save_parquet("market", "DXY", df)
         _update_manifest(manifest, "market", "DXY", df)
         print(f"  ok  DXY: {len(df)} rows")
@@ -428,15 +461,22 @@ def ingest_market(manifest: dict, incremental: bool = False):
     }
     for ticker, (name, start_p, drift, vol, seed) in comm_seeds.items():
         try:
+            df = None
             if yf_available:
-                df = yf.Ticker(ticker).history(period="5y")
-                if df.empty:
-                    raise ValueError("No data returned")
-            else:
+                try:
+                    df = yf.Ticker(ticker).history(period="5y")
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {name} ({ticker}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 idx = _date_index(1825)
                 n = len(idx)
                 close = _random_walk(start_p, drift=drift, vol=vol, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
+
             _save_parquet("market", ticker, df)
             _update_manifest(manifest, "market", ticker, df)
             print(f"  ok  {name} ({ticker}): {len(df)} rows")
@@ -449,16 +489,23 @@ def ingest_market(manifest: dict, incremental: bool = False):
     vol_seeds = {"^VIX": ("VIX", 18, 1.5, 106), "^MOVE": ("MOVE", 110, 5, 107)}
     for ticker, (name, center, vol_param, seed) in vol_seeds.items():
         try:
+            df = None
             if yf_available:
-                df = yf.Ticker(ticker).history(period="5y")
-                if df.empty:
-                    raise ValueError("No data returned")
-            else:
+                try:
+                    df = yf.Ticker(ticker).history(period="5y")
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {name} ({ticker}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 idx = _date_index(1825)
                 n = len(idx)
                 low, high = (9, 80) if name == "VIX" else (50, 200)
                 close = np.clip(_mean_reverting(center, vol=vol_param, n=n, seed=seed), low, high)
                 df = pd.DataFrame({"Close": close}, index=idx)
+
             _save_parquet("market", ticker, df)
             _update_manifest(manifest, "market", ticker, df)
             print(f"  ok  {name} ({ticker}): {len(df)} rows")
@@ -543,16 +590,23 @@ def ingest_semi(manifest: dict, incremental: bool = False):
     }
     for label, ticker in SEMI_TICKERS.items():
         try:
+            df = None
             if yf_available:
-                df = yf.Ticker(ticker).history(period="5y")
-                if df.empty:
-                    raise ValueError("No data returned")
-            else:
+                try:
+                    df = yf.Ticker(ticker).history(period="5y")
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {label} ({ticker}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 start_price, seed = seed_map.get(ticker, (100, 399))
                 idx = _date_index(1825)
                 n = len(idx)
                 close = _random_walk(start_price, drift=0.0005, vol=0.02, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
+
             _save_parquet("semi", ticker, df)
             _update_manifest(manifest, "semi", ticker, df)
             print(f"  ok  {label} ({ticker}): {len(df)} rows")
@@ -565,16 +619,23 @@ def ingest_semi(manifest: dict, incremental: bool = False):
     etf_seeds = {"SMH": (220, 320), "SOXX": (480, 321)}
     for label, ticker in SEMI_ETFS.items():
         try:
+            df = None
             if yf_available:
-                df = yf.Ticker(ticker).history(period="5y")
-                if df.empty:
-                    raise ValueError("No data returned")
-            else:
+                try:
+                    df = yf.Ticker(ticker).history(period="5y")
+                    if df is None or df.empty:
+                        df = None
+                except Exception as api_err:
+                    print(f"  WARN {label} ({ticker}): API failed ({api_err}), using mock")
+                    df = None
+
+            if df is None:
                 start_price, seed = etf_seeds.get(ticker, (100, 399))
                 idx = _date_index(1825)
                 n = len(idx)
                 close = _random_walk(start_price, drift=0.0005, vol=0.018, n=n, seed=seed)
                 df = pd.DataFrame({"Close": close}, index=idx)
+
             _save_parquet("semi", ticker, df)
             _update_manifest(manifest, "semi", ticker, df)
             print(f"  ok  {label} ({ticker}): {len(df)} rows")
