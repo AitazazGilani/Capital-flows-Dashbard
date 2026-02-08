@@ -741,3 +741,105 @@ Build in this exact order. Each step should be testable independently.
 | ECB | None | `https://data-api.ecb.europa.eu/service/data/EXR/` | Generous |
 | BIS | None | `https://stats.bis.org/api/v2/data/` | Generous |
 | Anthropic | API key | `anthropic` library | Per plan |
+
+---
+
+## Phase 2: Investment Decision Pages (Implemented)
+
+### pages/8_Cross_Asset_Signals.py ⭐ DECISION PAGE
+
+```
+Layout:
+- Relative Value Decision Matrix: combines ERP, carry trade, and flow signals
+  into a single score per country (-3 to +3). Color-coded table + bar chart.
+- Rate Differentials & Carry Trade: policy rate differentials vs US,
+  carry signal per country, visual bar chart
+- Equity Risk Premium (ERP): earnings yield - real yield per country.
+  Cheap/Fair/Rich classification. Bar chart with threshold lines.
+- Cross-Asset Momentum Dashboard: 1M and 3M returns across equities,
+  FX, and commodities. Trend classification (Strong Up/Down/Mixed).
+  Heatmap of equity momentum.
+- Macro Catalyst Scorecard: net positive/negative policy events per country
+  in last 90 days. Bullish/Bearish/Neutral classification.
+
+Data sources:
+- config.py: POLICY_RATES, COUNTRY_PE_ESTIMATES
+- processors: compute_rate_differentials, compute_equity_risk_premium,
+  compute_relative_value_matrix, compute_cross_asset_momentum,
+  compute_macro_catalyst_score
+- data_fetcher: existing WB/FX data + get_policy_events
+```
+
+### pages/9_Policy_Tracker.py ⭐ CATALYST PAGE
+
+```
+Layout:
+- Policy pulse metrics: event counts (30d/90d), bullish vs bearish
+- Filterable policy event timeline with expandable details
+  - Categories: Trade & Tariffs, Export Controls, Central Bank, Industrial Policy,
+    Capital Controls, Regulatory, Geopolitical
+  - Impact tagging: Positive/Negative/Mixed/Neutral
+- Event distribution charts: by category (horizontal bar), by impact (donut)
+- Central Bank Meeting Calendar: upcoming meetings with expected actions
+  and market probability. Urgency color coding by days until meeting.
+- US Tariff & Trade Policy Tracker: current vs pre-2025 rates by sector,
+  tariff escalation grouped bar chart, retaliation tracking
+- Key Macro Themes: curated strategic themes with status, description,
+  affected sectors, and investment direction
+
+Data sources (for live implementation):
+- Federal Register API (free, no key): US executive orders, rules
+- GDELT Project (free, no key): global geopolitical events
+- ProPublica Congress API (free, key required): US legislation
+- Trade.gov (free, no key): tariff and trade data
+- Central bank websites (free): meeting schedules, statements
+```
+
+### pages/10_Strategic_Sectors.py
+
+```
+Layout:
+- SOX vs S&P 500: normalized performance chart + relative strength line
+  - Metrics: SOX level, 1M return, outperformance vs S&P
+- Key Semiconductor Stocks: 11 stocks (NVDA, TSM, ASML, AMD, etc.)
+  - Performance table (1D, 1W, 1M, 3M, YTD returns)
+  - Normalized multi-line chart with toggle
+- Semiconductor Industry Cycle:
+  - Global revenue (quarterly bar + QoQ % line, dual axis)
+  - Book-to-Bill ratio + Inventory Days (dual axis)
+  - Automated cycle phase detection (Early Upcycle/Late Upcycle/Downcycle/Recovery)
+- Semiconductor ETFs: SMH, SOXX normalized chart
+- Semi-Relevant Policy Events: filtered from policy tracker (export controls,
+  CHIPS Act, China Big Fund, Taiwan Strait)
+- Investment Framework: how to use the page for allocation decisions
+
+Data sources (for live implementation):
+- yfinance (free, no key): all stock/ETF price data
+- SIA (free): quarterly semiconductor revenue + book-to-bill
+- SEMI (free reports): equipment billings, fab utilization
+- WSTS (free): semiconductor trade statistics forecasts
+```
+
+### New Processors (processors.py additions)
+
+```python
+compute_rate_differentials(countries) -> pd.DataFrame
+compute_equity_risk_premium(countries) -> pd.DataFrame
+compute_relative_value_matrix(countries, erp_df, carry_df, flow_signals) -> pd.DataFrame
+compute_cross_asset_momentum(equity_df, fx_df, commodity_df) -> pd.DataFrame
+compute_macro_catalyst_score(policy_events, lookback_days) -> pd.DataFrame
+compute_semi_relative_strength(semi_series, market_series) -> pd.Series
+```
+
+### New Data Fetchers (data_fetcher.py additions)
+
+```python
+get_semi_stocks(period) -> pd.DataFrame
+get_semi_etfs(period) -> pd.DataFrame
+get_semi_vs_market(period) -> pd.DataFrame
+get_semi_revenue_cycle() -> pd.DataFrame
+get_semi_inventory_cycle() -> pd.DataFrame
+get_policy_events() -> pd.DataFrame
+get_central_bank_calendar() -> pd.DataFrame
+get_tariff_tracker() -> pd.DataFrame
+```

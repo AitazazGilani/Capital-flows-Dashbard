@@ -45,6 +45,9 @@ then navigate to specific pages for detailed analysis.
 - **Capital Flows** ⭐ — Current account, trade balance, FDI, reserves, flow signals
 - **Country Risk** — Debt sustainability, fiscal position, risk scores
 - **Sentiment** — VIX, copper/gold ratio, consumer sentiment
+- **Cross-Asset Signals** ⭐ — Relative value matrix, carry trade, ERP, momentum, catalyst scores
+- **Policy Tracker** ⭐ — Trade policy, central bank calendar, tariffs, geopolitical events
+- **Strategic Sectors** — Semiconductor cycle, SOX relative strength, industry data
 
 *Data is currently using mock datasets for demonstration. Connect API keys in `.env` for live data.*
 """)
@@ -96,4 +99,34 @@ with col2:
     Country risk scores based on debt, fiscal position, and
     reserves. Sentiment indicators including VIX, MOVE, and
     consumer confidence.
+    """)
+
+st.divider()
+
+# -- New: Macro Catalysts & Investment Signals --
+st.header("Macro Catalysts & Investment Signals")
+
+col3, col4 = st.columns(2)
+
+with col3:
+    st.subheader("Cross-Asset Signals ⭐")
+    st.markdown("""
+    The decision page. Synthesizes rate differentials, equity risk
+    premiums, capital flow signals, and momentum into a single
+    relative value score per country. Tells you **where to allocate**.
+    """)
+
+    st.subheader("Strategic Sectors")
+    st.markdown("""
+    Deep-dive into semiconductors — SOX vs S&P relative strength,
+    revenue and inventory cycles, book-to-bill ratio, and policy
+    events affecting the supply chain.
+    """)
+
+with col4:
+    st.subheader("Policy & Geopolitical Tracker ⭐")
+    st.markdown("""
+    The catalyst page. Tracks trade policy (tariffs, export controls),
+    central bank decisions, industrial policy (CHIPS Act, Big Fund),
+    and geopolitical events. These are what **move capital flows**.
     """)
