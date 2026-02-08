@@ -49,7 +49,7 @@ then navigate to specific pages for detailed analysis.
 - **Policy Tracker** ⭐ — Trade policy, central bank calendar, tariffs, geopolitical events
 - **Strategic Sectors** — Semiconductor cycle, SOX relative strength, industry data
 
-*Data is currently using mock datasets for demonstration. Connect API keys in `.env` for live data.*
+*Data loaded from Parquet files. Run `python ingestor.py --full` to refresh. Add API keys in `.env` for live data.*
 """)
 
 st.info(f"**Selected countries:** {', '.join(selected)}  |  **Date range:** {date_range}")
