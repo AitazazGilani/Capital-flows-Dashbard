@@ -80,7 +80,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("M2 Money Supply (US)")
     m2_df = m2.to_frame(name="M2")
-    m2_df["M2 YoY %"] = m2_df["M2"].pct_change(periods=52) * 100  # approx weekly -> annual
+    m2_df["M2 YoY %"] = m2_df["M2"].pct_change(periods=52, fill_method=None) * 100  # approx weekly -> annual
     st.plotly_chart(
         dual_axis_chart(
             m2_df["M2"], m2_df["M2 YoY %"],

@@ -66,10 +66,10 @@ def _filter_by_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
 # Helper: generate realistic time series
 # ---------------------------------------------------------------------------
 
-def _date_index(days=1825):
-    """Generate a business day index for the given number of days back."""
+def _date_index(days=None):
+    """Generate a business day index. Default: from 2020-01-01 to 2026-02-06."""
     end = datetime(2026, 2, 6)
-    start = end - timedelta(days=days)
+    start = datetime(2020, 1, 1) if days is None else end - timedelta(days=days)
     return pd.bdate_range(start=start, end=end)
 
 
@@ -114,7 +114,7 @@ def get_index_data(ticker: str, period: str = "5y") -> pd.DataFrame:
         "^GDAXI": (15000, 54),
     }
     start_price, seed = seed_map.get(ticker, (1000, 99))
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     close = _random_walk(start_price, drift=0.0003, vol=0.012, n=n, seed=seed)
     rng = np.random.RandomState(seed)
@@ -160,7 +160,7 @@ def get_fx_rates(country_codes: list, period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(df, period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     fx_data = {}
     fx_seeds = {
@@ -189,7 +189,7 @@ def get_dxy(period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(pq, period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     close = _random_walk(104, drift=0.0001, vol=0.004, n=n, seed=100)
     return pd.DataFrame({"Close": close}, index=idx)
@@ -213,7 +213,7 @@ def get_commodities(period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(pd.DataFrame(comm_data), period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     return pd.DataFrame({
         "Gold": _random_walk(1950, drift=0.0003, vol=0.008, n=n, seed=101),
@@ -237,7 +237,7 @@ def get_volatility(period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(pd.DataFrame(vol_data), period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     return pd.DataFrame({
         "VIX": np.clip(_mean_reverting(18, vol=1.5, n=n, seed=106), 9, 80),
@@ -256,10 +256,13 @@ def get_fred_series(series_id: str, start: str = "2000-01-01") -> pd.Series:
     if pq is not None:
         series = pq.iloc[:, 0]  # First column is the value
         series.name = series_id
+        # Forward-fill NaN gaps (standard for financial time series —
+        # e.g. Fed Funds Rate on a holiday equals the last trading day's rate)
+        series = series.ffill()
         return series
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     mock_params = {
         "DFF": (5.33, 0.05, 108),           # Fed Funds Rate
@@ -465,7 +468,7 @@ def get_imf_gold_reserves(country_code: str) -> pd.DataFrame:
 @st.cache_data(ttl=86400)
 def get_ecb_fx(currency: str = "USD") -> pd.DataFrame:
     """ECB reference rate - mock."""
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     rate = _random_walk(1.08, drift=0.0001, vol=0.005, n=n, seed=200)
     return pd.DataFrame({"Rate": rate}, index=idx)
@@ -524,7 +527,7 @@ def get_semi_stocks(period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(pd.DataFrame(semi_data), period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     seed_map = {
         "^SOX": (3800, 300), "NVDA": (480, 301), "TSM": (105, 302),
@@ -553,7 +556,7 @@ def get_semi_etfs(period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(pd.DataFrame(etf_data), period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     data = {
         "SMH (VanEck Semi ETF)": _random_walk(220, drift=0.0005, vol=0.018, n=n, seed=320),
@@ -575,7 +578,7 @@ def get_semi_vs_market(period: str = "5y") -> pd.DataFrame:
             return _filter_by_period(df, period)
 
     # Mock fallback
-    idx = _date_index(1825)
+    idx = _date_index()
     n = len(idx)
     return pd.DataFrame({
         "SOX (Semis)": _random_walk(3800, drift=0.0005, vol=0.02, n=n, seed=300),
