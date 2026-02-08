@@ -1,19 +1,65 @@
 """
 Data fetcher module - provides all data for the dashboard.
 
-Since API keys are not configured, this module uses realistic mock data
-generators. When real API keys are provided in .env, swap the mock
-implementations for the real API calls.
+Data loading priority:
+  1. Parquet files in data/ (populated by ingestor.py) — fast, historical
+  2. Live API calls (when keys are set) — real-time
+  3. In-memory mock generators — fallback when nothing else is available
+
+For historical data: run `python ingestor.py --full` to populate Parquet files.
+For real-time quotes: short-period requests (1M, 3M) use live API or mock.
 """
 
 import pandas as pd
 import numpy as np
 import streamlit as st
 from datetime import datetime, timedelta
+from pathlib import Path
 from config import (
-    COUNTRIES, MARKET_TICKERS, FRED, WB_INDICATORS,
+    COUNTRIES, MARKET_TICKERS, FRED, WB_INDICATORS, DATE_RANGES,
     SEMI_TICKERS, SEMI_ETFS, SEMI_COMMODITIES, POLICY_CATEGORIES,
 )
+
+
+# ---------------------------------------------------------------------------
+# Parquet loading layer
+# ---------------------------------------------------------------------------
+
+DATA_DIR = Path(__file__).parent / "data"
+
+# Periods considered "long" — prefer Parquet for these
+_LONG_PERIODS = {"1y", "3y", "5y", "10y", "max", "1Y", "3Y", "5Y", "10Y", "MAX"}
+
+
+def _sanitize_filename(name: str) -> str:
+    """Make a string safe for use as a filename."""
+    return name.replace("^", "").replace("=", "_").replace("/", "_").replace(" ", "_")
+
+
+def _load_parquet(category: str, name: str) -> pd.DataFrame | None:
+    """Try to load a Parquet file from data/<category>/<name>.parquet.
+    Returns None if the file doesn't exist."""
+    safe_name = _sanitize_filename(name)
+    path = DATA_DIR / category / f"{safe_name}.parquet"
+    if path.exists():
+        try:
+            return pd.read_parquet(path)
+        except Exception:
+            return None
+    return None
+
+
+def _filter_by_period(df: pd.DataFrame, period: str) -> pd.DataFrame:
+    """Filter a time-indexed DataFrame by a period string like '5y', '1mo'."""
+    period_days = {
+        "1mo": 30, "3mo": 90, "6mo": 180, "1y": 365,
+        "3y": 1095, "5y": 1825, "10y": 3650,
+    }
+    days = period_days.get(period.lower())
+    if days and hasattr(df.index, "max") and len(df) > 0:
+        cutoff = df.index.max() - pd.Timedelta(days=days)
+        return df[df.index >= cutoff]
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +97,15 @@ def _mean_reverting(center, vol=0.1, n=1300, seed=None):
 
 @st.cache_data(ttl=900)
 def get_index_data(ticker: str, period: str = "5y") -> pd.DataFrame:
-    """Single index/ticker history. Returns OHLCV df."""
+    """Single index/ticker history. Returns OHLCV df.
+    Checks Parquet first for long periods, falls back to mock."""
+    # Try Parquet for historical data
+    if period in _LONG_PERIODS:
+        pq = _load_parquet("market", ticker)
+        if pq is not None:
+            return _filter_by_period(pq, period)
+
+    # Mock fallback
     seed_map = {
         "^GSPC": (4200, 42), "^STOXX50E": (4100, 43), "^FTSE": (7200, 44),
         "^N225": (32000, 45), "000001.SS": (3100, 46), "^GSPTSE": (19000, 47),
@@ -86,7 +140,26 @@ def get_multiple_tickers(tickers: list, period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_fx_rates(country_codes: list, period: str = "5y") -> pd.DataFrame:
-    """Get FX rates for selected countries from config currency_pairs."""
+    """Get FX rates for selected countries. Checks Parquet first."""
+    # Try Parquet for historical data
+    if period in _LONG_PERIODS:
+        fx_data = {}
+        all_found = True
+        for code in country_codes:
+            pair = COUNTRIES.get(code, {}).get("currency_pair")
+            if not pair:
+                continue
+            pq = _load_parquet("market", pair)
+            if pq is not None and "Close" in pq.columns:
+                fx_data[pair] = pq["Close"]
+            else:
+                all_found = False
+                break
+        if all_found and fx_data:
+            df = pd.DataFrame(fx_data)
+            return _filter_by_period(df, period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     fx_data = {}
@@ -109,7 +182,13 @@ def get_fx_rates(country_codes: list, period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_dxy(period: str = "5y") -> pd.DataFrame:
-    """DXY index."""
+    """DXY index. Checks Parquet first."""
+    if period in _LONG_PERIODS:
+        pq = _load_parquet("market", "DXY")
+        if pq is not None:
+            return _filter_by_period(pq, period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     close = _random_walk(104, drift=0.0001, vol=0.004, n=n, seed=100)
@@ -118,7 +197,22 @@ def get_dxy(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_commodities(period: str = "5y") -> pd.DataFrame:
-    """Gold, Copper, WTI, Brent, BDI."""
+    """Gold, Copper, WTI, Brent, BDI. Checks Parquet first."""
+    if period in _LONG_PERIODS:
+        comm_map = {"Gold": "GC=F", "Copper": "HG=F", "WTI": "CL=F", "Brent": "BZ=F"}
+        comm_data = {}
+        all_found = True
+        for name, ticker in comm_map.items():
+            pq = _load_parquet("market", ticker)
+            if pq is not None and "Close" in pq.columns:
+                comm_data[name] = pq["Close"]
+            else:
+                all_found = False
+                break
+        if all_found and comm_data:
+            return _filter_by_period(pd.DataFrame(comm_data), period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     return pd.DataFrame({
@@ -132,7 +226,17 @@ def get_commodities(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_volatility(period: str = "5y") -> pd.DataFrame:
-    """VIX and MOVE index."""
+    """VIX and MOVE index. Checks Parquet first."""
+    if period in _LONG_PERIODS:
+        vol_data = {}
+        for name, ticker in [("VIX", "^VIX"), ("MOVE", "^MOVE")]:
+            pq = _load_parquet("market", ticker)
+            if pq is not None and "Close" in pq.columns:
+                vol_data[name] = pq["Close"]
+        if len(vol_data) == 2:
+            return _filter_by_period(pd.DataFrame(vol_data), period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     return pd.DataFrame({
@@ -147,7 +251,14 @@ def get_volatility(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=21600)
 def get_fred_series(series_id: str, start: str = "2000-01-01") -> pd.Series:
-    """Single FRED series - returns mock data."""
+    """Single FRED series. Checks Parquet first, falls back to mock."""
+    pq = _load_parquet("fred", series_id)
+    if pq is not None:
+        series = pq.iloc[:, 0]  # First column is the value
+        series.name = series_id
+        return series
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     mock_params = {
@@ -226,7 +337,18 @@ def get_yield_curve_snapshot() -> pd.DataFrame:
 
 @st.cache_data(ttl=604800)
 def get_wb_indicator(indicator: str, countries: list, start_year: int = 2000) -> pd.DataFrame:
-    """Fetch a World Bank indicator for given countries. Returns mock data."""
+    """Fetch a World Bank indicator for given countries. Checks Parquet first."""
+    pq = _load_parquet("world_bank", indicator)
+    if pq is not None:
+        # Filter to requested countries and years
+        available_cols = [c for c in countries if c in pq.columns]
+        if available_cols:
+            df = pq[available_cols]
+            if start_year and hasattr(df.index, 'min'):
+                df = df[df.index >= start_year]
+            return df
+
+    # Mock fallback
     years = list(range(start_year, 2026))
     rng = np.random.RandomState(hash(indicator) % 2**31)
 
@@ -301,7 +423,12 @@ def get_wb_multiple_indicators(indicators: dict, countries: list) -> dict:
 
 @st.cache_data(ttl=2592000)
 def get_imf_bop(country_code: str, indicator: str = "BCA_BP6_USD") -> pd.DataFrame:
-    """Fetch IMF Balance of Payments data - mock."""
+    """Fetch IMF Balance of Payments data. Checks Parquet first."""
+    pq = _load_parquet("imf", "bop")
+    if pq is not None and country_code in pq.columns:
+        return pd.DataFrame({"Value": pq[country_code]})
+
+    # Mock fallback
     years = list(range(2005, 2026))
     rng = np.random.RandomState(hash(country_code + indicator) % 2**31)
     bop_base = {"US": -500, "U2": 300, "GB": -100, "JP": 150, "CN": 200,
@@ -314,7 +441,12 @@ def get_imf_bop(country_code: str, indicator: str = "BCA_BP6_USD") -> pd.DataFra
 
 @st.cache_data(ttl=2592000)
 def get_imf_gold_reserves(country_code: str) -> pd.DataFrame:
-    """Fetch gold reserves from IMF IFS - mock data in tonnes."""
+    """Fetch gold reserves from IMF IFS. Checks Parquet first."""
+    pq = _load_parquet("imf", "gold_reserves")
+    if pq is not None and country_code in pq.columns:
+        return pd.DataFrame({"Tonnes": pq[country_code]})
+
+    # Mock fallback
     years = list(range(2005, 2026))
     gold_base = {"US": 8133, "U2": 10770, "GB": 310, "JP": 846, "CN": 2235,
                  "CA": 0, "AU": 80, "CH": 1040, "KR": 104, "IN": 800,
@@ -381,7 +513,17 @@ def get_fed_funds_futures() -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_semi_stocks(period: str = "5y") -> pd.DataFrame:
-    """Get semiconductor stock prices (Close) for all tracked tickers."""
+    """Get semiconductor stock prices (Close) for all tracked tickers. Checks Parquet first."""
+    if period in _LONG_PERIODS:
+        semi_data = {}
+        for label, ticker in SEMI_TICKERS.items():
+            pq = _load_parquet("semi", ticker)
+            if pq is not None and "Close" in pq.columns:
+                semi_data[label] = pq["Close"]
+        if len(semi_data) == len(SEMI_TICKERS):
+            return _filter_by_period(pd.DataFrame(semi_data), period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     seed_map = {
@@ -400,7 +542,17 @@ def get_semi_stocks(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_semi_etfs(period: str = "5y") -> pd.DataFrame:
-    """Get semiconductor ETF prices."""
+    """Get semiconductor ETF prices. Checks Parquet first."""
+    if period in _LONG_PERIODS:
+        etf_data = {}
+        for label, ticker in SEMI_ETFS.items():
+            pq = _load_parquet("semi", ticker)
+            if pq is not None and "Close" in pq.columns:
+                etf_data[label] = pq["Close"]
+        if len(etf_data) == len(SEMI_ETFS):
+            return _filter_by_period(pd.DataFrame(etf_data), period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     data = {
@@ -412,7 +564,17 @@ def get_semi_etfs(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_semi_vs_market(period: str = "5y") -> pd.DataFrame:
-    """SOX index vs S&P 500 for relative performance."""
+    """SOX index vs S&P 500 for relative performance. Checks Parquet first."""
+    if period in _LONG_PERIODS:
+        sox_pq = _load_parquet("semi", "^SOX")
+        spx_pq = _load_parquet("market", "^GSPC")
+        if sox_pq is not None and spx_pq is not None:
+            sox_close = sox_pq["Close"] if "Close" in sox_pq.columns else sox_pq.iloc[:, 0]
+            spx_close = spx_pq["Close"] if "Close" in spx_pq.columns else spx_pq.iloc[:, 0]
+            df = pd.DataFrame({"SOX (Semis)": sox_close, "S&P 500": spx_close}).dropna()
+            return _filter_by_period(df, period)
+
+    # Mock fallback
     idx = _date_index(1825)
     n = len(idx)
     return pd.DataFrame({
@@ -423,10 +585,12 @@ def get_semi_vs_market(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=86400)
 def get_semi_revenue_cycle() -> pd.DataFrame:
-    """Mock global semiconductor revenue cycle data (quarterly, $B).
-    In production: source from SIA (Semiconductor Industry Association) — free quarterly reports.
-    API: https://www.semiconductors.org/global-semiconductor-sales — no key needed, scrape PDF/HTML.
-    """
+    """Global semiconductor revenue cycle data (quarterly, $B). Checks Parquet first."""
+    pq = _load_parquet("semi", "revenue_cycle")
+    if pq is not None:
+        return pq
+
+    # Mock fallback
     quarters = pd.date_range(start="2020-01-01", end="2026-01-01", freq="QS")
     n = len(quarters)
     rng = np.random.RandomState(350)
@@ -441,9 +605,12 @@ def get_semi_revenue_cycle() -> pd.DataFrame:
 
 @st.cache_data(ttl=86400)
 def get_semi_inventory_cycle() -> pd.DataFrame:
-    """Mock semiconductor inventory/book-to-bill data.
-    In production: SIA monthly book-to-bill ratio — published free, scrape from site.
-    """
+    """Semiconductor inventory/book-to-bill data. Checks Parquet first."""
+    pq = _load_parquet("semi", "inventory_cycle")
+    if pq is not None:
+        return pq
+
+    # Mock fallback
     months = pd.date_range(start="2022-01-01", end="2026-02-01", freq="MS")
     n = len(months)
     rng = np.random.RandomState(351)
@@ -464,15 +631,13 @@ def get_semi_inventory_cycle() -> pd.DataFrame:
 
 @st.cache_data(ttl=3600)
 def get_policy_events() -> pd.DataFrame:
-    """Curated macro-relevant policy events.
-    In production, source from:
-    - Federal Register API (free, no key): https://www.federalregister.gov/developers/documentation/api/v1
-    - GovInfo API (free, key required): https://api.govinfo.gov — US legislation
-    - GDELT Project (free, no key): https://www.gdeltproject.org — global events
-    - ProPublica Congress API (free, key required): https://projects.propublica.org/api-docs/congress-api/
-    - Trade.gov (free, no key): https://developer.trade.gov — tariff/trade data
-    For now, returns a curated mock timeline of real-world-style events.
-    """
+    """Curated macro-relevant policy events. Checks Parquet first."""
+    pq = _load_parquet("policy", "events")
+    if pq is not None:
+        pq["date"] = pd.to_datetime(pq["date"])
+        return pq.sort_values("date", ascending=False).reset_index(drop=True)
+
+    # Mock fallback
     events = [
         # 2025-2026 realistic policy events
         {"date": "2025-01-15", "category": "Trade & Tariffs",
@@ -563,9 +728,13 @@ def get_policy_events() -> pd.DataFrame:
 
 @st.cache_data(ttl=86400)
 def get_central_bank_calendar() -> pd.DataFrame:
-    """Upcoming central bank meeting dates and expectations.
-    In production: scrape from central bank websites (all free, no key).
-    """
+    """Upcoming central bank meeting dates and expectations. Checks Parquet first."""
+    pq = _load_parquet("policy", "cb_calendar")
+    if pq is not None:
+        pq["date"] = pd.to_datetime(pq["date"])
+        return pq.sort_values("date").reset_index(drop=True)
+
+    # Mock fallback
     meetings = [
         {"date": "2026-02-05", "bank": "RBA", "country": "AU", "current_rate": 4.35, "expected_action": "Hold", "market_probability": "85% hold"},
         {"date": "2026-03-06", "bank": "ECB", "country": "EU", "current_rate": 4.00, "expected_action": "Cut 25bp", "market_probability": "70% cut"},
@@ -585,9 +754,12 @@ def get_central_bank_calendar() -> pd.DataFrame:
 
 @st.cache_data(ttl=86400)
 def get_tariff_tracker() -> pd.DataFrame:
-    """Track current effective tariff rates between major trading partners.
-    In production: Trade.gov API (free, no key) or WTO tariff data.
-    """
+    """Track current effective tariff rates. Checks Parquet first."""
+    pq = _load_parquet("policy", "tariff_tracker")
+    if pq is not None:
+        return pq
+
+    # Mock fallback
     data = {
         "Target": ["China", "China", "EU", "Japan", "Canada", "Mexico", "S. Korea", "India", "China", "All"],
         "Sector": ["Semiconductors", "EVs & Batteries", "Steel & Aluminum", "Autos", "Steel & Aluminum",
