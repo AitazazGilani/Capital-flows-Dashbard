@@ -86,6 +86,12 @@ Every data function follows the same three-tier priority:
 3. Mock generator        -->  Always works, returns reproducible data
 ```
 
+**NaN Handling**: Real API data (especially FRED) may contain NaN gaps (weekends,
+holidays, reporting delays). The data_fetcher forward-fills (`ffill()`) FRED series
+before returning them, ensuring `.iloc[-1]` always returns a valid value for metrics.
+The ingestor also gracefully falls back to mock data when a live API is installed but
+the call fails (network errors, rate limits, proxy blocks).
+
 ## File Structure
 
 ```

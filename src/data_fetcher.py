@@ -256,6 +256,9 @@ def get_fred_series(series_id: str, start: str = "2000-01-01") -> pd.Series:
     if pq is not None:
         series = pq.iloc[:, 0]  # First column is the value
         series.name = series_id
+        # Forward-fill NaN gaps (standard for financial time series —
+        # e.g. Fed Funds Rate on a holiday equals the last trading day's rate)
+        series = series.ffill()
         return series
 
     # Mock fallback
