@@ -5,14 +5,14 @@ Current account, trade balance, FDI, reserves, flow signals.
 
 import streamlit as st
 import pandas as pd
-from config import COUNTRIES, WB_INDICATORS
-from data_fetcher import (
+from src.config import COUNTRIES, WB_INDICATORS
+from src.data_fetcher import (
     get_wb_indicator, get_fx_rates, get_imf_gold_reserves,
 )
-from chart_helpers import (
+from src.chart_helpers import (
     line_chart, bar_chart, grouped_bar_chart, sortable_table, metric_row,
 )
-from processors import compute_flow_signals
+from src.processors import compute_flow_signals
 
 st.session_state.current_page = "Capital Flows"
 st.header("⭐ Capital Flows")

@@ -103,14 +103,16 @@ See [docs/architecture.md](docs/architecture.md) for the full system architectur
 
 ```
 ├── app.py              # Entry point — sidebar controls and home page
-├── config.py           # All constants (countries, FRED IDs, WB indicators, tickers)
 ├── ingestor.py         # CLI tool — historical data ingestion to Parquet
-├── data_fetcher.py     # Data access layer (Parquet -> API -> Mock fallback)
-├── processors.py       # Derived indicators (net liquidity, ERP, flow signals, risk scores)
-├── chart_helpers.py    # Reusable Plotly chart functions
-├── claude_chat.py      # AI chat sidebar with context builder
 ├── requirements.txt    # Python dependencies
 ├── .env                # API keys (gitignored)
+├── src/                # Application source code
+│   ├── config.py       # All constants (countries, FRED IDs, WB indicators, tickers)
+│   ├── data_fetcher.py # Data access layer (Parquet -> API -> Mock fallback)
+│   ├── processors.py   # Derived indicators (net liquidity, ERP, flow signals, risk scores)
+│   ├── chart_helpers.py# Reusable Plotly chart functions
+│   └── claude_chat.py  # AI chat sidebar with context builder
+├── pages/              # Streamlit pages (10 total)
 ├── data/               # Parquet file store (gitignored, created by ingestor.py)
 │   ├── manifest.json   # Ingestion metadata
 │   ├── fred/           # 21 FRED series
@@ -119,7 +121,6 @@ See [docs/architecture.md](docs/architecture.md) for the full system architectur
 │   ├── imf/            # BOP, gold reserves
 │   ├── semi/           # Semiconductor stocks, cycles
 │   └── policy/         # Policy events, CB calendar, tariffs
-├── pages/              # Streamlit pages (10 total)
 ├── docs/               # Architecture and usage documentation
 └── ai-conversations/   # AI session summaries
 ```

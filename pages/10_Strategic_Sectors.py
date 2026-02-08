@@ -6,17 +6,17 @@ Tracks SOX vs market, key stocks, revenue/inventory cycles, supply chain policy.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from config import SEMI_TICKERS, SEMI_ETFS
-from data_fetcher import (
+from src.config import SEMI_TICKERS, SEMI_ETFS
+from src.data_fetcher import (
     get_semi_stocks, get_semi_etfs, get_semi_vs_market,
     get_semi_revenue_cycle, get_semi_inventory_cycle,
     get_policy_events,
 )
-from chart_helpers import (
+from src.chart_helpers import (
     line_chart, dual_axis_chart, bar_chart, metric_row,
     CHART_TEMPLATE, CHART_MARGINS, CHART_FONT, COLORS,
 )
-from processors import compute_semi_relative_strength
+from src.processors import compute_semi_relative_strength
 
 st.session_state.current_page = "Strategic Sectors"
 st.header("Strategic Sectors: Semiconductors")

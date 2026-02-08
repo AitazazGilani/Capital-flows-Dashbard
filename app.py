@@ -4,8 +4,8 @@ Tracks global macro indicators, capital flows, and market data.
 """
 
 import streamlit as st
-from config import COUNTRIES, DEFAULT_COUNTRIES, DATE_RANGES
-from claude_chat import render_chat_sidebar
+from src.config import COUNTRIES, DEFAULT_COUNTRIES, DATE_RANGES
+from src.claude_chat import render_chat_sidebar
 
 st.set_page_config(page_title="Macro Dashboard", layout="wide", page_icon="🌍")
 

@@ -4,13 +4,13 @@ Page 3: Rates & Credit — Yield curve, rate expectations, credit spreads.
 
 import streamlit as st
 import pandas as pd
-from config import FRED
-from data_fetcher import get_fred_series, get_fred_multiple, get_yield_curve_snapshot, get_fed_funds_futures
-from chart_helpers import (
+from src.config import FRED
+from src.data_fetcher import get_fred_series, get_fred_multiple, get_yield_curve_snapshot, get_fed_funds_futures
+from src.chart_helpers import (
     line_chart, dual_axis_chart, yield_curve_chart,
     step_chart, metric_row,
 )
-from processors import compute_implied_rate_path
+from src.processors import compute_implied_rate_path
 
 st.session_state.current_page = "Rates & Credit"
 st.header("Rates & Credit")

@@ -5,10 +5,10 @@ Page 7: Sentiment — VIX, copper/gold ratio, consumer sentiment.
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-from config import FRED
-from data_fetcher import get_volatility, get_commodities, get_fred_series
-from chart_helpers import line_chart, dual_axis_chart, metric_row, CHART_TEMPLATE, CHART_MARGINS, CHART_FONT, COLORS
-from processors import compute_copper_gold_ratio
+from src.config import FRED
+from src.data_fetcher import get_volatility, get_commodities, get_fred_series
+from src.chart_helpers import line_chart, dual_axis_chart, metric_row, CHART_TEMPLATE, CHART_MARGINS, CHART_FONT, COLORS
+from src.processors import compute_copper_gold_ratio
 
 st.session_state.current_page = "Sentiment"
 st.header("Sentiment")
