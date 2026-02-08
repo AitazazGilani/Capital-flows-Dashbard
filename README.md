@@ -63,7 +63,17 @@ ANTHROPIC_API_KEY=your_anthropic_key_here
 
 The other data sources (yfinance, World Bank, IMF, ECB, BIS) do not require API keys.
 
-### 5. Run the dashboard
+### 5. Load historical data (optional but recommended)
+
+```bash
+python ingestor.py --full
+```
+
+This populates the `data/` directory with Parquet files for fast historical data loading. The dashboard works without this step (falls back to in-memory mock data), but Parquet is faster and supports real API data when keys are configured.
+
+See [docs/ingestor-usage.md](docs/ingestor-usage.md) for full CLI reference.
+
+### 6. Run the dashboard
 
 ```bash
 streamlit run app.py
@@ -71,34 +81,47 @@ streamlit run app.py
 
 The app opens at `http://localhost:8501`. Use the sidebar to select countries, adjust the date range, and chat with the AI analyst.
 
-## Mock data
+## Data Layer
 
-The dashboard ships with mock data generators so it works out of the box without any API keys. Mock data uses seeded random walks for reproducibility and covers all data sources (market prices, FRED economic series, World Bank annual indicators, IMF balance of payments, semiconductor industry data, and policy events).
+The dashboard uses a three-tier data loading strategy:
 
-To switch to live data, add your API keys to `.env`. The fetching functions in `data_fetcher.py` are the only file that needs changes — swap the mock implementations for real API calls.
+```
+1. Parquet files (data/)  →  Fastest, populated by ingestor.py
+2. Live API calls         →  When API keys are set (FRED, yfinance, etc.)
+3. In-memory mock         →  Always works, no setup needed
+```
+
+**Historical data** (FRED series, World Bank indicators, market history) is loaded from Parquet files in `data/`. Run `python ingestor.py --full` to populate these. Update them with `python ingestor.py --update`.
+
+**Real-time data** (current FX rates, live index prices, intraday quotes) is fetched at runtime by the dashboard with short cache TTLs.
+
+The dashboard works out of the box without any API keys or running the ingestor — mock data generators provide reproducible data using seeded random walks.
+
+See [docs/architecture.md](docs/architecture.md) for the full system architecture.
 
 ## Project structure
 
 ```
 ├── app.py              # Entry point — sidebar controls and home page
-├── config.py           # All constants (countries, FRED IDs, WB indicators, tickers, semi stocks)
-├── data_fetcher.py     # Data fetching functions (mock data by default)
-├── processors.py       # Derived indicators (net liquidity, flow signals, risk scores, relative value)
+├── config.py           # All constants (countries, FRED IDs, WB indicators, tickers)
+├── ingestor.py         # CLI tool — historical data ingestion to Parquet
+├── data_fetcher.py     # Data access layer (Parquet -> API -> Mock fallback)
+├── processors.py       # Derived indicators (net liquidity, ERP, flow signals, risk scores)
 ├── chart_helpers.py    # Reusable Plotly chart functions
 ├── claude_chat.py      # AI chat sidebar with context builder
 ├── requirements.txt    # Python dependencies
 ├── .env                # API keys (gitignored)
-└── pages/
-    ├── 1_Markets.py
-    ├── 2_Liquidity.py
-    ├── 3_Rates_Credit.py
-    ├── 4_Economy.py
-    ├── 5_Capital_Flows.py
-    ├── 6_Country_Risk.py
-    ├── 7_Sentiment.py
-    ├── 8_Cross_Asset_Signals.py
-    ├── 9_Policy_Tracker.py
-    └── 10_Strategic_Sectors.py
+├── data/               # Parquet file store (gitignored, created by ingestor.py)
+│   ├── manifest.json   # Ingestion metadata
+│   ├── fred/           # 21 FRED series
+│   ├── world_bank/     # 12 World Bank indicators
+│   ├── market/         # Equity indices, FX, commodities, volatility
+│   ├── imf/            # BOP, gold reserves
+│   ├── semi/           # Semiconductor stocks, cycles
+│   └── policy/         # Policy events, CB calendar, tariffs
+├── pages/              # Streamlit pages (10 total)
+├── docs/               # Architecture and usage documentation
+└── ai-conversations/   # AI session summaries
 ```
 
 ## Data sources
