@@ -9,11 +9,11 @@
                  +--------+---------+
                           |
               Parquet     |     Live APIs (FRED, yfinance, wbgapi)
-              write       |     or mock generators
+              write       |
                           v
                  +------------------+
                  |    data/         |  Parquet file store
-                 |  fred/           |  ~50 files, ~5 MB total
+                 |  fred/           |  ~84 files, ~3 MB total
                  |  world_bank/     |
                  |  market/         |
                  |  imf/            |
@@ -22,12 +22,12 @@
                  |  manifest.json   |
                  +--------+---------+
                           |
-              Parquet     |     In-memory mock (fallback)
+              Parquet     |
               read        |
                           v
           +-------------------------------+
           |        data_fetcher.py        |  Data access layer
-          |  Parquet -> Live API -> Mock  |  Three-tier fallback
+          |  Parquet -> Live API          |  Two-tier loading
           +-------------------------------+
                     |           |
           +---------+     +----+-----+
@@ -57,40 +57,36 @@
 ### Historical Data (via Ingestor)
 
 ```
-API / Mock  -->  ingestor.py  -->  data/*.parquet  -->  data_fetcher.py  -->  pages/
+Live API  -->  ingestor.py  -->  data/*.parquet  -->  data_fetcher.py  -->  pages/
 ```
 
-1. **Ingestor** fetches data from APIs (or generates mock) and writes Parquet files
+1. **Ingestor** fetches data from live APIs and writes Parquet files
 2. **data_fetcher.py** reads Parquet on first call, caches in memory via `st.cache_data`
 3. **Pages** call data_fetcher functions and render charts
 
 ### Real-Time Data (Runtime)
 
 ```
-yfinance / Mock  -->  data_fetcher.py  -->  pages/
+yfinance  -->  data_fetcher.py  -->  pages/
 ```
 
 1. For short periods (1M, 3M), data_fetcher skips Parquet and fetches live
 2. Cached for 15 minutes via `st.cache_data(ttl=900)`
-3. Falls back to in-memory mock when no API available
 
 ### Fallback Chain
 
-Every data function follows the same three-tier priority:
+Every data function follows a two-tier priority:
 
 ```
 1. Parquet file exists?  -->  Yes: read and return (fast, ~1ms)
                           -->  No: continue
 2. Live API available?   -->  Yes: fetch and return (slower, ~500ms-2s)
-                          -->  No: continue
-3. Mock generator        -->  Always works, returns reproducible data
+                          -->  No: return empty DataFrame
 ```
 
 **NaN Handling**: Real API data (especially FRED) may contain NaN gaps (weekends,
 holidays, reporting delays). The data_fetcher forward-fills (`ffill()`) FRED series
 before returning them, ensuring `.iloc[-1]` always returns a valid value for metrics.
-The ingestor also gracefully falls back to mock data when a live API is installed but
-the call fails (network errors, rate limits, proxy blocks).
 
 ## File Structure
 
@@ -104,7 +100,7 @@ Capital-flows-Dashboard/
 ├── src/                       # Application source code
 │   ├── __init__.py
 │   ├── config.py              # All constants (countries, tickers, indicators)
-│   ├── data_fetcher.py        # Data access: Parquet -> API -> Mock
+│   ├── data_fetcher.py        # Data access: Parquet -> Live API
 │   ├── processors.py          # Derived indicators (net liquidity, ERP, etc.)
 │   ├── chart_helpers.py       # Reusable Plotly charts (dark theme)
 │   └── claude_chat.py         # AI sidebar with context-aware responses
@@ -186,16 +182,9 @@ If the project grows to 500+ series or needs concurrent writes, SQLite or DuckDB
 
 The dashboard doesn't merge historical Parquet with live API data. Instead:
 - **Long periods** (1Y+): served from Parquet, updated by running `ingestor.py --update`
-- **Short periods** (1M, 3M): served from live API (yfinance) or mock
+- **Short periods** (1M, 3M): served from live API (yfinance)
 
 This avoids complex merging logic. To keep historical data fresh, run the ingestor periodically (daily cron, or manually before analysis sessions).
-
-### Mock Data Strategy
-
-Mock generators use `np.random.RandomState(seed)` with fixed seeds, producing identical data across runs. This means:
-- Dashboard works identically without any API keys
-- Screenshots and demos are reproducible
-- No external dependencies for development or testing
 
 ## Data Sources
 

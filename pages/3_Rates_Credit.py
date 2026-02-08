@@ -45,35 +45,41 @@ st.divider()
 
 # --- Yield Curve ---
 st.subheader("US Treasury Yield Curve")
-st.plotly_chart(
-    yield_curve_chart(yield_curve),
-    use_container_width=True,
-)
+if not yield_curve.empty:
+    st.plotly_chart(
+        yield_curve_chart(yield_curve),
+        use_container_width=True,
+    )
+else:
+    st.info("Yield curve snapshot data not available. Ingest yield curve data to display.")
 
 st.divider()
 
 # --- Fed Funds Futures Implied Rate Path ---
 st.subheader("Fed Funds Futures — Implied Rate Path")
-implied = compute_implied_rate_path(futures, fed_funds.iloc[-1])
+if not futures.empty and not fed_funds.empty:
+    implied = compute_implied_rate_path(futures, fed_funds.iloc[-1])
 
-st.plotly_chart(
-    step_chart(
-        implied["contract_month"], implied["implied_rate"],
-        "Implied Fed Funds Rate Path",
-        yaxis_title="Implied Rate (%)"
-    ),
-    use_container_width=True,
-)
+    st.plotly_chart(
+        step_chart(
+            implied["contract_month"], implied["implied_rate"],
+            "Implied Fed Funds Rate Path",
+            yaxis_title="Implied Rate (%)"
+        ),
+        use_container_width=True,
+    )
 
-# Table of implied rates
-st.dataframe(
-    implied[["contract_month", "implied_rate", "cuts_25bp"]].rename(columns={
-        "contract_month": "Month",
-        "implied_rate": "Implied Rate (%)",
-        "cuts_25bp": "Cumulative Cuts (25bp)",
-    }).set_index("Month"),
-    use_container_width=True,
-)
+    # Table of implied rates
+    st.dataframe(
+        implied[["contract_month", "implied_rate", "cuts_25bp"]].rename(columns={
+            "contract_month": "Month",
+            "implied_rate": "Implied Rate (%)",
+            "cuts_25bp": "Cumulative Cuts (25bp)",
+        }).set_index("Month"),
+        use_container_width=True,
+    )
+else:
+    st.info("Fed funds futures data not available. Ingest futures data to display.")
 
 st.divider()
 
@@ -113,15 +119,17 @@ st.plotly_chart(
 )
 
 # Store summary for Claude
-st.session_state.rates_summary = {
-    "fed_funds": f"{fed_funds.iloc[-1]:.2f}%",
-    "us_10y": f"{us_10y.iloc[-1]:.2f}%",
-    "us_2y": f"{us_2y.iloc[-1]:.2f}%",
-    "spread_2s10s": f"{us_2s10s.iloc[-1]:.2f}%",
-    "hy_oas": f"{hy_oas.iloc[-1]:.0f} bps",
-    "ig_oas": f"{ig_oas.iloc[-1]:.0f} bps",
-    "nfci": f"{nfci.iloc[-1]:.2f}",
-    "real_yield_10y": f"{real_yield.iloc[-1]:.2f}%",
-    "breakeven_10y": f"{breakeven.iloc[-1]:.2f}%",
-    "rate_cuts_priced_12m": f"{implied['cuts_25bp'].iloc[-1]:.1f} cuts",
-}
+rates_summary = {}
+for name, series in [("fed_funds", fed_funds), ("us_10y", us_10y), ("us_2y", us_2y),
+                      ("spread_2s10s", us_2s10s), ("hy_oas", hy_oas), ("ig_oas", ig_oas),
+                      ("nfci", nfci), ("real_yield_10y", real_yield), ("breakeven_10y", breakeven)]:
+    if not series.empty:
+        fmt = ".0f" if name in ("hy_oas", "ig_oas") else ".2f"
+        suffix = " bps" if "oas" in name else "%"
+        if name == "nfci":
+            suffix = ""
+        rates_summary[name] = f"{series.iloc[-1]:{fmt}}{suffix}"
+if not futures.empty and not fed_funds.empty:
+    implied_data = compute_implied_rate_path(futures, fed_funds.iloc[-1])
+    rates_summary["rate_cuts_priced_12m"] = f"{implied_data['cuts_25bp'].iloc[-1]:.1f} cuts"
+st.session_state.rates_summary = rates_summary

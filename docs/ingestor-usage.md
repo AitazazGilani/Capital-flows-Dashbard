@@ -31,25 +31,29 @@ Macro Dashboard Ingestor — Full run
 Started: 2026-02-08T12:00:00
 
 [FRED] Ingesting US macro series...
-  No FRED_API_KEY found, using mock data
-  ok  fed_funds (DFF): 1305 rows
-  ok  us_10y (DGS10): 1305 rows
+  Using live FRED API
+  ok  fed_funds (DFF): 1593 rows
+  ok  us_10y (DGS10): 1593 rows
   ...
 
 [World Bank] Ingesting international indicators...
-  ok  current_account_pct_gdp (BN.CAB.XOKA.GD.ZS): 26 rows x 13 countries
+  Using live World Bank API
+  ok  current_account_pct_gdp (BN.CAB.XOKA.GD.ZS): 6 rows x 13 countries
   ...
 
 [Market] Ingesting market price history...
+  Using live yfinance API
   ...
 
-Finished in 4.2s — 52 ok, 0 errors
+Finished in 12.5s — 84 ok, 0 errors
 Manifest saved to data/manifest.json
 ```
 
+**Note:** Sources without live API integration (IMF, policy) will be skipped. Install required packages and set API keys for full ingestion.
+
 ### `--update` — Incremental Update
 
-Fetches only new data since the last run. For FRED with a live API key, this appends only missing dates. For mock data, it regenerates (same result due to fixed seeds).
+Fetches only new data since the last run. For FRED with a live API key, this appends only missing dates. Incremental updates require the same API access as full runs.
 
 ```bash
 python ingestor.py --update
@@ -101,7 +105,7 @@ Data Manifest (52 entries)
 
 ### `--clean` — Remove All Data
 
-Deletes the entire `data/` directory. The dashboard falls back to in-memory mock data.
+Deletes the entire `data/` directory. The dashboard will show empty data until the ingestor is run again.
 
 ```bash
 python ingestor.py --clean
@@ -109,14 +113,14 @@ python ingestor.py --clean
 
 ## Sources Reference
 
-| Source | Parquet Directory | # Files | Live API | Mock Fallback |
-|--------|------------------|---------|----------|---------------|
-| `fred` | `data/fred/` | 21 | FRED API (needs `FRED_API_KEY`) | Mean-reverting series |
-| `world_bank` | `data/world_bank/` | 12 | wbgapi (no key) | Random walk per country |
-| `market` | `data/market/` | ~29 | yfinance (no key) | Geometric random walks |
-| `imf` | `data/imf/` | 2 | IMF API (no key) | Mean-reverting |
-| `semi` | `data/semi/` | ~15 | yfinance for stocks | Random walks + cycle sim |
-| `policy` | `data/policy/` | 3 | Curated events | 20 mock events |
+| Source | Parquet Directory | # Files | Live API | Status |
+|--------|------------------|---------|----------|--------|
+| `fred` | `data/fred/` | 21 | FRED API (needs `FRED_API_KEY`) | Requires API key |
+| `world_bank` | `data/world_bank/` | 12 | wbgapi (no key needed) | Ready |
+| `market` | `data/market/` | ~32 | yfinance (no key needed) | Ready |
+| `imf` | `data/imf/` | 2 | IMF API (not yet integrated) | Needs implementation |
+| `semi` | `data/semi/` | ~15 | yfinance for stocks/ETFs | Stocks ready; cycles need SIA API |
+| `policy` | `data/policy/` | 3 | Federal Register / GDELT (not yet integrated) | Needs implementation |
 
 ## Parquet File Format
 
@@ -200,20 +204,18 @@ In `data_fetcher.py`, every function follows this pattern:
 @st.cache_data(ttl=900)
 def get_some_data(period="5y"):
     # 1. Try Parquet (fast, historical)
-    if period in _LONG_PERIODS:
-        pq = _load_parquet("category", "name")
-        if pq is not None:
-            return _filter_by_period(pq, period)
+    pq = _load_parquet("category", "name")
+    if pq is not None:
+        return _filter_by_period(pq, period)
 
-    # 2. Mock fallback (always works)
-    return _generate_mock_data()
+    # 2. No data available
+    return pd.DataFrame()
 ```
 
-- **Long periods** (1Y, 3Y, 5Y, 10Y, MAX): check Parquet first
-- **Short periods** (1M, 3M): skip Parquet, use live/mock for freshness
-- **No Parquet**: falls back to in-memory mock transparently
+- **Parquet available**: read and filter by period
+- **No Parquet**: returns empty DataFrame (pages handle gracefully)
 
-The dashboard works with or without the ingestor having been run.
+The ingestor must be run to populate data before the dashboard shows content.
 
 ## Troubleshooting
 

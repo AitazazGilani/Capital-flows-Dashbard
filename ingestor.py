@@ -2,8 +2,8 @@
 """
 Historical Data Ingestor for Macro Dashboard
 
-Fetches historical data from APIs (or generates mock data when keys are
-unavailable) and stores as Parquet files for fast dashboard loading.
+Fetches historical data from live APIs and stores as Parquet files for
+fast dashboard loading. Requires API keys and/or packages to be installed.
 
 Usage:
     python ingestor.py --full              # Full historical load, all sources
@@ -20,10 +20,9 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 # Load .env if python-dotenv is available
@@ -53,30 +52,8 @@ HIST_START = datetime(2020, 1, 1)
 
 
 # ---------------------------------------------------------------------------
-# Mock data helpers (same generators as data_fetcher.py, no Streamlit dep)
+# Helpers
 # ---------------------------------------------------------------------------
-
-def _date_index(days=None):
-    end = datetime(2026, 2, 6)
-    start = HIST_START if days is None else end - timedelta(days=days)
-    return pd.bdate_range(start=start, end=end)
-
-
-def _random_walk(start, drift=0.0002, vol=0.01, n=1300, seed=None):
-    rng = np.random.RandomState(seed)
-    returns = rng.normal(drift, vol, n)
-    prices = start * np.exp(np.cumsum(returns))
-    return prices
-
-
-def _mean_reverting(center, vol=0.1, n=1300, seed=None):
-    rng = np.random.RandomState(seed)
-    series = np.zeros(n)
-    series[0] = center
-    for i in range(1, n):
-        series[i] = series[i - 1] + 0.05 * (center - series[i - 1]) + rng.normal(0, vol)
-    return series
-
 
 def _sanitize_filename(name: str) -> str:
     """Make a string safe for use as a filename."""
@@ -189,7 +166,7 @@ def _load_existing_parquet(category: str, name: str) -> pd.DataFrame | None:
 # ---------------------------------------------------------------------------
 
 def ingest_fred(manifest: dict, incremental: bool = False, rate_limits: dict = None):
-    """Ingest all FRED series."""
+    """Ingest all FRED series. Requires FRED_API_KEY."""
     print("\n[FRED] Ingesting US macro series...")
     fred_key = os.getenv("FRED_API_KEY")
 
@@ -200,74 +177,47 @@ def ingest_fred(manifest: dict, incremental: bool = False, rate_limits: dict = N
             fred_client = Fred(api_key=fred_key)
             print("  Using live FRED API")
         except ImportError:
-            print("  fredapi not installed, falling back to mock")
+            print("  fredapi not installed — run: pip install fredapi")
+            print("  Skipping FRED source.")
+            return
     else:
-        print("  No FRED_API_KEY found, using mock data")
-
-    # Mock parameters (same seeds as data_fetcher.py)
-    mock_params = {
-        "DFF": (5.33, 0.05, 108), "DGS10": (4.2, 0.08, 109),
-        "DGS2": (4.5, 0.1, 110), "T10Y2Y": (-0.3, 0.08, 111),
-        "DFII10": (1.8, 0.1, 112), "T10YIE": (2.3, 0.05, 113),
-        "WALCL": (7800000, 50000, 114), "RRPONTSYD": (500000, 30000, 115),
-        "WTREGEN": (750000, 40000, 116), "WM2NS": (20800, 100, 117),
-        "BAMLH0A0HYM2": (3.8, 0.3, 118), "BAMLC0A0CM": (1.2, 0.1, 119),
-        "NFCI": (-0.3, 0.1, 120), "ICSA": (220000, 8000, 121),
-        "CCSA": (1850000, 30000, 122), "UMCSENT": (68, 3, 123),
-        "CPIAUCSL": (310, 0.5, 124), "UNRATE": (3.8, 0.1, 125),
-        "PSAVERT": (4.5, 0.5, 126), "INDPRO": (103, 0.3, 127),
-        "USALOLITONOSTSAM": (99.5, 0.2, 128),
-    }
+        print("  No FRED_API_KEY found — set it in .env to ingest FRED data.")
+        print("  Skipping FRED source.")
+        return
 
     ok, fail = 0, 0
     for label, series_id in FRED.items():
         try:
-            df = None
-            if fred_client:
-                try:
-                    start = "2020-01-01"
-                    if incremental:
-                        existing = _load_existing_parquet("fred", series_id)
-                        if existing is not None and len(existing) > 0:
-                            start = str(existing.index.max().date())
-                    data = fred_client.get_series(series_id, observation_start=start)
-                    df = data.to_frame(name="value")
-                    if incremental and existing is not None:
-                        df = pd.concat([existing, df]).loc[~pd.concat([existing, df]).index.duplicated(keep="last")]
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "fred", series_id, str(api_err))
-                        print(f"  RATE LIMIT {label} ({series_id}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return ok, fail
-                    print(f"  WARN {label} ({series_id}): API failed ({api_err}), using mock")
-                    df = None
+            start = "2020-01-01"
+            if incremental:
+                existing = _load_existing_parquet("fred", series_id)
+                if existing is not None and len(existing) > 0:
+                    start = str(existing.index.max().date())
 
-            if df is None:
-                # --- Mock data ---
-                idx = _date_index()
-                n = len(idx)
-                center, vol, seed = mock_params.get(series_id, (100, 1, 199))
-                values = _mean_reverting(center, vol=vol, n=n, seed=seed)
+            data = fred_client.get_series(series_id, observation_start=start)
+            if data is None or data.empty:
+                _update_manifest(manifest, "fred", series_id, error="Empty response from API")
+                print(f"  SKIP {label} ({series_id}): empty API response")
+                fail += 1
+                continue
 
-                # Add trends for specific series
-                if series_id == "WALCL":
-                    values = values + np.linspace(0, -500000, n)
-                elif series_id == "RRPONTSYD":
-                    values = np.clip(values + np.linspace(1500000, 0, n), 0, None)
-                elif series_id == "CPIAUCSL":
-                    values = values + np.linspace(-10, 10, n)
-
-                df = pd.DataFrame({"value": values}, index=idx)
+            df = data.to_frame(name="value")
+            if incremental:
+                existing = _load_existing_parquet("fred", series_id)
+                if existing is not None:
+                    df = pd.concat([existing, df]).loc[~pd.concat([existing, df]).index.duplicated(keep="last")]
 
             _save_parquet("fred", series_id, df)
             _update_manifest(manifest, "fred", series_id, df)
             print(f"  ok  {label} ({series_id}): {len(df)} rows")
             ok += 1
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "fred", series_id, str(e))
+                print(f"  RATE LIMIT {label} ({series_id}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return ok, fail
             _update_manifest(manifest, "fred", series_id, error=str(e))
             print(f"  ERR {label} ({series_id}): {e}")
             fail += 1
@@ -280,101 +230,43 @@ def ingest_fred(manifest: dict, incremental: bool = False, rate_limits: dict = N
 # ---------------------------------------------------------------------------
 
 def ingest_world_bank(manifest: dict, incremental: bool = False, rate_limits: dict = None):
-    """Ingest World Bank indicators for all tracked countries."""
+    """Ingest World Bank indicators for all tracked countries. Requires wbgapi."""
     print("\n[World Bank] Ingesting international indicators...")
 
-    wb_available = False
     try:
         import wbgapi as wb
-        wb_available = True
         print("  Using live World Bank API")
     except ImportError:
-        print("  wbgapi not installed, using mock data")
+        print("  wbgapi not installed — run: pip install wbgapi")
+        print("  Skipping World Bank source.")
+        return
 
     wb_codes = [v["wb_code"] for v in COUNTRIES.values()]
-
-    # Mock base values (same as data_fetcher.py)
-    base_values = {
-        "BN.CAB.XOKA.GD.ZS": {"US": -3.0, "EU": 2.5, "UK": -3.5, "JP": 3.5, "CN": 1.5,
-                                "CA": -1.0, "AU": -2.0, "CH": 8.0, "KR": 4.0, "IN": -1.5,
-                                "BR": -2.5, "MX": -1.0, "DE": 7.0},
-        "NE.RSB.GNFS.CD": {"US": -8e11, "EU": 3e11, "UK": -2e11, "JP": 1.5e11, "CN": 5e11,
-                            "CA": -5e10, "AU": -3e10, "CH": 5e10, "KR": 6e10, "IN": -1.5e11,
-                            "BR": -3e10, "MX": -1e10, "DE": 2.5e11},
-        "BX.KLT.DINV.CD.WD": {"US": 3.5e11, "EU": 2e11, "UK": 1.5e11, "JP": 3e10, "CN": 1.8e11,
-                                "CA": 5e10, "AU": 6e10, "CH": 4e10, "KR": 1.5e10, "IN": 5e10,
-                                "BR": 7e10, "MX": 3.5e10, "DE": 4e10},
-        "BM.KLT.DINV.CD.WD": {"US": 4e11, "EU": 2.5e11, "UK": 1.2e11, "JP": 1.5e11, "CN": 1.2e11,
-                                "CA": 8e10, "AU": 3e10, "CH": 1e11, "KR": 5e10, "IN": 2e10,
-                                "BR": 1.5e10, "MX": 1e10, "DE": 1e11},
-        "FI.RES.TOTL.CD": {"US": 2.4e11, "EU": 3e11, "UK": 1.8e11, "JP": 1.3e12, "CN": 3.2e12,
-                            "CA": 1e11, "AU": 6e10, "CH": 9e11, "KR": 4.2e11, "IN": 6e11,
-                            "BR": 3.5e11, "MX": 2e11, "DE": 2.5e11},
-        "GC.DOD.TOTL.GD.ZS": {"US": 120, "EU": 90, "UK": 100, "JP": 260, "CN": 75,
-                                "CA": 105, "AU": 55, "CH": 40, "KR": 50, "IN": 85,
-                                "BR": 90, "MX": 55, "DE": 65},
-        "GC.BAL.CASH.GD.ZS": {"US": -6.0, "EU": -3.0, "UK": -5.0, "JP": -8.0, "CN": -5.0,
-                                "CA": -2.0, "AU": -1.0, "CH": 1.0, "KR": 0.5, "IN": -7.0,
-                                "BR": -5.0, "MX": -3.5, "DE": 0.5},
-        "NY.GDP.MKTP.CD": {"US": 2.5e13, "EU": 1.4e13, "UK": 3.1e12, "JP": 4.2e12, "CN": 1.8e13,
-                            "CA": 2e12, "AU": 1.7e12, "CH": 8e11, "KR": 1.7e12, "IN": 3.5e12,
-                            "BR": 2e12, "MX": 1.3e12, "DE": 4.1e12},
-        "NY.GDP.MKTP.KD.ZG": {"US": 2.5, "EU": 1.5, "UK": 1.3, "JP": 1.0, "CN": 5.5,
-                                "CA": 2.0, "AU": 2.5, "CH": 1.5, "KR": 2.5, "IN": 6.5,
-                                "BR": 1.5, "MX": 2.0, "DE": 1.0},
-        "FP.CPI.TOTL.ZG": {"US": 3.5, "EU": 2.8, "UK": 4.0, "JP": 3.0, "CN": 0.5,
-                            "CA": 3.2, "AU": 4.5, "CH": 1.5, "KR": 3.5, "IN": 5.5,
-                            "BR": 5.0, "MX": 5.5, "DE": 3.0},
-        "SL.UEM.TOTL.ZS": {"US": 3.8, "EU": 6.5, "UK": 4.0, "JP": 2.6, "CN": 5.2,
-                            "CA": 5.5, "AU": 3.8, "CH": 2.0, "KR": 3.0, "IN": 7.5,
-                            "BR": 8.0, "MX": 3.5, "DE": 3.2},
-    }
-    wb_code_to_short = {v["wb_code"]: k for k, v in COUNTRIES.items()}
 
     ok, fail = 0, 0
     for ind_name, ind_code in WB_INDICATORS.items():
         try:
-            df = None
-            if wb_available:
-                try:
-                    raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2020, 2026))
-                    df = raw.T
-                    df.index = df.index.astype(int)
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "world_bank", ind_code, str(api_err))
-                        print(f"  RATE LIMIT {ind_name} ({ind_code}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return ok, fail
-                    print(f"  WARN {ind_name} ({ind_code}): API failed ({api_err}), using mock")
-                    df = None
+            raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2020, 2026))
+            df = raw.T
+            df.index = df.index.astype(int)
 
-            if df is None:
-                # --- Mock data ---
-                years = list(range(2020, 2026))
-                rng = np.random.RandomState(hash(ind_code) % 2**31)
-                defaults = base_values.get(ind_code, {})
-                data = {}
-                for wb_c in wb_codes:
-                    short = wb_code_to_short.get(wb_c, wb_c)
-                    base = defaults.get(short, 0)
-                    scale = abs(base) * 0.05 if base != 0 else 1
-                    current = base
-                    vals = []
-                    for _ in years:
-                        current = current + rng.normal(0, scale)
-                        vals.append(current)
-                    data[wb_c] = vals
-                df = pd.DataFrame(data, index=years)
+            if df is None or df.empty:
+                _update_manifest(manifest, "world_bank", ind_code, error="Empty response from API")
+                print(f"  SKIP {ind_name} ({ind_code}): empty API response")
+                fail += 1
+                continue
 
             _save_parquet("world_bank", ind_code, df)
             _update_manifest(manifest, "world_bank", ind_code, df)
             print(f"  ok  {ind_name} ({ind_code}): {len(df)} rows x {len(df.columns)} countries")
             ok += 1
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "world_bank", ind_code, str(e))
+                print(f"  RATE LIMIT {ind_name} ({ind_code}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return ok, fail
             _update_manifest(manifest, "world_bank", ind_code, error=str(e))
             print(f"  ERR {ind_name} ({ind_code}): {e}")
             fail += 1
@@ -387,214 +279,137 @@ def ingest_world_bank(manifest: dict, incremental: bool = False, rate_limits: di
 # ---------------------------------------------------------------------------
 
 def ingest_market(manifest: dict, incremental: bool = False, rate_limits: dict = None):
-    """Ingest market price history — equity indices, FX, commodities, volatility, DXY."""
+    """Ingest market price history. Requires yfinance."""
     print("\n[Market] Ingesting market price history...")
 
-    yf_available = False
     try:
         import yfinance as yf
-        yf_available = True
         print("  Using live yfinance API")
     except ImportError:
-        print("  yfinance not installed, using mock data")
+        print("  yfinance not installed — run: pip install yfinance")
+        print("  Skipping Market source.")
+        return
 
     # --- Equity Indices ---
     print("  -- Equity Indices --")
-    index_seeds = {
-        "^GSPC": (4200, 42), "^STOXX50E": (4100, 43), "^FTSE": (7200, 44),
-        "^N225": (32000, 45), "000001.SS": (3100, 46), "^GSPTSE": (19000, 47),
-        "^AXJO": (7000, 48), "^SSMI": (11000, 49), "^KS11": (2400, 50),
-        "^BSESN": (60000, 51), "^BVSP": (115000, 52), "^MXX": (52000, 53),
-        "^GDAXI": (15000, 54),
-    }
     for code, meta in COUNTRIES.items():
         ticker = meta["index"]
         try:
-            df = None
-            if yf_available:
-                try:
-                    obj = yf.Ticker(ticker)
-                    df = obj.history(period="5y")
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "market", ticker, str(api_err))
-                        print(f"  RATE LIMIT {code} ({ticker}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return
-                    print(f"  WARN {code} ({ticker}): API failed ({api_err}), using mock")
-                    df = None
-
-            if df is None:
-                start_price, seed = index_seeds.get(ticker, (1000, 99))
-                idx = _date_index()
-                n = len(idx)
-                close = _random_walk(start_price, drift=0.0003, vol=0.012, n=n, seed=seed)
-                rng = np.random.RandomState(seed)
-                df = pd.DataFrame({
-                    "Open": close * (1 + rng.normal(0, 0.002, n)),
-                    "High": close * (1 + np.abs(rng.normal(0, 0.008, n))),
-                    "Low": close * (1 - np.abs(rng.normal(0, 0.008, n))),
-                    "Close": close,
-                    "Volume": (rng.lognormal(20, 1, n)).astype(int),
-                }, index=idx)
+            obj = yf.Ticker(ticker)
+            df = obj.history(period="5y")
+            if df is None or df.empty:
+                _update_manifest(manifest, "market", ticker, error="Empty response from yfinance")
+                print(f"  SKIP {code} ({ticker}): empty API response")
+                continue
 
             _save_parquet("market", ticker, df)
             _update_manifest(manifest, "market", ticker, df)
             print(f"  ok  {code} ({ticker}): {len(df)} rows")
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "market", ticker, str(e))
+                print(f"  RATE LIMIT {code} ({ticker}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return
             _update_manifest(manifest, "market", ticker, error=str(e))
             print(f"  ERR {code} ({ticker}): {e}")
 
     # --- FX Rates ---
     print("  -- FX Rates --")
-    fx_seeds = {
-        "EURUSD=X": (1.08, 70), "GBPUSD=X": (1.26, 71), "USDJPY=X": (148, 72),
-        "USDCNY=X": (7.20, 73), "USDCAD=X": (1.36, 74), "AUDUSD=X": (0.66, 75),
-        "USDCHF=X": (0.88, 76), "USDKRW=X": (1320, 77), "USDINR=X": (83.5, 78),
-        "USDBRL=X": (4.95, 79), "USDMXN=X": (17.2, 80),
-    }
     for code, meta in COUNTRIES.items():
         pair = meta.get("currency_pair")
         if not pair:
             continue
         try:
-            df = None
-            if yf_available:
-                try:
-                    obj = yf.Ticker(pair)
-                    df = obj.history(period="5y")
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "market", pair, str(api_err))
-                        print(f"  RATE LIMIT {code} FX ({pair}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return
-                    print(f"  WARN {code} FX ({pair}): API failed ({api_err}), using mock")
-                    df = None
-
-            if df is None:
-                start_price, seed = fx_seeds.get(pair, (1.0, 99))
-                idx = _date_index()
-                n = len(idx)
-                close = _random_walk(start_price, drift=0.0001, vol=0.005, n=n, seed=seed)
-                df = pd.DataFrame({"Close": close}, index=idx)
+            obj = yf.Ticker(pair)
+            df = obj.history(period="5y")
+            if df is None or df.empty:
+                _update_manifest(manifest, "market", pair, error="Empty response from yfinance")
+                print(f"  SKIP {code} FX ({pair}): empty API response")
+                continue
 
             _save_parquet("market", pair, df)
             _update_manifest(manifest, "market", pair, df)
             print(f"  ok  {code} FX ({pair}): {len(df)} rows")
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "market", pair, str(e))
+                print(f"  RATE LIMIT {code} FX ({pair}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return
             _update_manifest(manifest, "market", pair, error=str(e))
             print(f"  ERR {code} FX ({pair}): {e}")
 
     # --- DXY ---
     print("  -- DXY --")
     try:
-        df = None
-        if yf_available:
-            try:
-                df = yf.Ticker("DX-Y.NYB").history(period="5y")
-                if df is None or df.empty:
-                    df = None
-            except Exception as api_err:
-                if _is_rate_limit_error(api_err) and rate_limits is not None:
-                    _record_rate_limit(rate_limits, "market", "DXY", str(api_err))
-                    print(f"  RATE LIMIT DXY: {api_err}")
-                    _save_rate_limits(rate_limits)
-                    print(f"  Rate limit saved. Moving to next source...")
-                    return
-                print(f"  WARN DXY: API failed ({api_err}), using mock")
-                df = None
-
-        if df is None:
-            idx = _date_index()
-            n = len(idx)
-            close = _random_walk(104, drift=0.0001, vol=0.004, n=n, seed=100)
-            df = pd.DataFrame({"Close": close}, index=idx)
-
-        _save_parquet("market", "DXY", df)
-        _update_manifest(manifest, "market", "DXY", df)
-        print(f"  ok  DXY: {len(df)} rows")
+        df = yf.Ticker("DX-Y.NYB").history(period="5y")
+        if df is not None and not df.empty:
+            _save_parquet("market", "DXY", df)
+            _update_manifest(manifest, "market", "DXY", df)
+            print(f"  ok  DXY: {len(df)} rows")
+        else:
+            _update_manifest(manifest, "market", "DXY", error="Empty response from yfinance")
+            print("  SKIP DXY: empty API response")
     except Exception as e:
+        if _is_rate_limit_error(e) and rate_limits is not None:
+            _record_rate_limit(rate_limits, "market", "DXY", str(e))
+            print(f"  RATE LIMIT DXY: {e}")
+            _save_rate_limits(rate_limits)
+            print(f"  Rate limit saved. Moving to next source...")
+            return
         _update_manifest(manifest, "market", "DXY", error=str(e))
         print(f"  ERR DXY: {e}")
 
     # --- Commodities ---
     print("  -- Commodities --")
-    comm_seeds = {
-        "GC=F": ("Gold", 1950, 0.0003, 0.008, 101),
-        "HG=F": ("Copper", 3.80, 0.0002, 0.015, 102),
-        "CL=F": ("WTI", 75, 0.0001, 0.02, 103),
-        "BZ=F": ("Brent", 80, 0.0001, 0.02, 104),
+    commodity_tickers = {
+        "GC=F": "Gold", "HG=F": "Copper", "CL=F": "WTI", "BZ=F": "Brent",
     }
-    for ticker, (name, start_p, drift, vol, seed) in comm_seeds.items():
+    for ticker, name in commodity_tickers.items():
         try:
-            df = None
-            if yf_available:
-                try:
-                    df = yf.Ticker(ticker).history(period="5y")
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "market", ticker, str(api_err))
-                        print(f"  RATE LIMIT {name} ({ticker}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return
-                    print(f"  WARN {name} ({ticker}): API failed ({api_err}), using mock")
-                    df = None
-
-            if df is None:
-                idx = _date_index()
-                n = len(idx)
-                close = _random_walk(start_p, drift=drift, vol=vol, n=n, seed=seed)
-                df = pd.DataFrame({"Close": close}, index=idx)
+            df = yf.Ticker(ticker).history(period="5y")
+            if df is None or df.empty:
+                _update_manifest(manifest, "market", ticker, error="Empty response from yfinance")
+                print(f"  SKIP {name} ({ticker}): empty API response")
+                continue
 
             _save_parquet("market", ticker, df)
             _update_manifest(manifest, "market", ticker, df)
             print(f"  ok  {name} ({ticker}): {len(df)} rows")
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "market", ticker, str(e))
+                print(f"  RATE LIMIT {name} ({ticker}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return
             _update_manifest(manifest, "market", ticker, error=str(e))
             print(f"  ERR {name} ({ticker}): {e}")
 
     # --- Volatility (VIX, MOVE) ---
     print("  -- Volatility --")
-    vol_seeds = {"^VIX": ("VIX", 18, 1.5, 106), "^MOVE": ("MOVE", 110, 5, 107)}
-    for ticker, (name, center, vol_param, seed) in vol_seeds.items():
+    vol_tickers = {"^VIX": "VIX", "^MOVE": "MOVE"}
+    for ticker, name in vol_tickers.items():
         try:
-            df = None
-            if yf_available:
-                try:
-                    df = yf.Ticker(ticker).history(period="5y")
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "market", ticker, str(api_err))
-                        print(f"  RATE LIMIT {name} ({ticker}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return
-                    print(f"  WARN {name} ({ticker}): API failed ({api_err}), using mock")
-                    df = None
-
-            if df is None:
-                idx = _date_index()
-                n = len(idx)
-                low, high = (9, 80) if name == "VIX" else (50, 200)
-                close = np.clip(_mean_reverting(center, vol=vol_param, n=n, seed=seed), low, high)
-                df = pd.DataFrame({"Close": close}, index=idx)
+            df = yf.Ticker(ticker).history(period="5y")
+            if df is None or df.empty:
+                _update_manifest(manifest, "market", ticker, error="Empty response from yfinance")
+                print(f"  SKIP {name} ({ticker}): empty API response")
+                continue
 
             _save_parquet("market", ticker, df)
             _update_manifest(manifest, "market", ticker, df)
             print(f"  ok  {name} ({ticker}): {len(df)} rows")
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "market", ticker, str(e))
+                print(f"  RATE LIMIT {name} ({ticker}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return
             _update_manifest(manifest, "market", ticker, error=str(e))
             print(f"  ERR {name} ({ticker}): {e}")
 
@@ -606,47 +421,15 @@ def ingest_market(manifest: dict, incremental: bool = False, rate_limits: dict =
 # ---------------------------------------------------------------------------
 
 def ingest_imf(manifest: dict, incremental: bool = False, rate_limits: dict = None):
-    """Ingest IMF BOP and gold reserve data."""
-    print("\n[IMF] Ingesting balance of payments and gold reserves...")
-    print("  Using mock data (IMF API is flaky; swap when needed)")
+    """Ingest IMF BOP and gold reserve data.
 
-    imf_codes = {k: v["imf_code"] for k, v in COUNTRIES.items()}
-    bop_base = {"US": -500, "U2": 300, "GB": -100, "JP": 150, "CN": 200,
-                "CA": -30, "AU": -50, "CH": 70, "KR": 80, "IN": -40,
-                "BR": -50, "MX": -20, "DE": 250}
-    gold_base = {"US": 8133, "U2": 10770, "GB": 310, "JP": 846, "CN": 2235,
-                 "CA": 0, "AU": 80, "CH": 1040, "KR": 104, "IN": 800,
-                 "BR": 130, "MX": 120, "DE": 3355}
-
-    years = list(range(2020, 2026))
-
-    # --- BOP ---
-    print("  -- Balance of Payments --")
-    bop_data = {}
-    for short, imf_c in imf_codes.items():
-        base = bop_base.get(imf_c, 0)
-        values = _mean_reverting(base, vol=abs(base) * 0.1 + 10,
-                                 n=len(years), seed=hash(imf_c) % 2**31)
-        bop_data[imf_c] = values
-    df_bop = pd.DataFrame(bop_data, index=years)
-    _save_parquet("imf", "bop", df_bop)
-    _update_manifest(manifest, "imf", "bop", df_bop)
-    print(f"  ok  BOP: {len(df_bop)} years x {len(df_bop.columns)} countries")
-
-    # --- Gold Reserves ---
-    print("  -- Gold Reserves --")
-    gold_data = {}
-    for short, imf_c in imf_codes.items():
-        base = gold_base.get(imf_c, 100)
-        rng = np.random.RandomState(hash(imf_c + "gold") % 2**31)
-        values = base + np.cumsum(rng.normal(0, base * 0.005, len(years)))
-        gold_data[imf_c] = np.clip(values, 0, None)
-    df_gold = pd.DataFrame(gold_data, index=years)
-    _save_parquet("imf", "gold_reserves", df_gold)
-    _update_manifest(manifest, "imf", "gold_reserves", df_gold)
-    print(f"  ok  Gold reserves: {len(df_gold)} years x {len(df_gold.columns)} countries")
-
-    print("[IMF] Done")
+    NOTE: Requires a real IMF API client. Currently no live API is integrated.
+    Existing Parquet files (if any) are preserved. To add live IMF data,
+    implement an API client here.
+    """
+    print("\n[IMF] Skipping — no live IMF API integration yet.")
+    print("  Existing Parquet files in data/imf/ are preserved.")
+    print("  To add: implement IMF IFS/BOP API client in this function.")
 
 
 # ---------------------------------------------------------------------------
@@ -654,120 +437,71 @@ def ingest_imf(manifest: dict, incremental: bool = False, rate_limits: dict = No
 # ---------------------------------------------------------------------------
 
 def ingest_semi(manifest: dict, incremental: bool = False, rate_limits: dict = None):
-    """Ingest semiconductor stock history, ETFs, revenue and inventory cycles."""
+    """Ingest semiconductor stock/ETF history via yfinance.
+
+    NOTE: Revenue cycle and inventory cycle require SIA/industry APIs
+    not yet integrated. Existing Parquet files for those are preserved.
+    """
     print("\n[Semi] Ingesting semiconductor sector data...")
 
-    yf_available = False
     try:
         import yfinance as yf
-        yf_available = True
         print("  Using live yfinance for stocks/ETFs")
     except ImportError:
-        print("  yfinance not installed, using mock data")
+        print("  yfinance not installed — run: pip install yfinance")
+        print("  Skipping Semi source.")
+        return
 
     # --- Semi Stocks ---
     print("  -- Semi Stocks --")
-    seed_map = {
-        "^SOX": (3800, 300), "NVDA": (480, 301), "TSM": (105, 302),
-        "ASML": (680, 303), "AMD": (120, 304), "INTC": (35, 305),
-        "AVGO": (900, 306), "QCOM": (145, 307), "MU": (80, 308),
-        "LRCX": (680, 309), "AMAT": (160, 310),
-    }
     for label, ticker in SEMI_TICKERS.items():
         try:
-            df = None
-            if yf_available:
-                try:
-                    df = yf.Ticker(ticker).history(period="5y")
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "semi", ticker, str(api_err))
-                        print(f"  RATE LIMIT {label} ({ticker}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return
-                    print(f"  WARN {label} ({ticker}): API failed ({api_err}), using mock")
-                    df = None
-
-            if df is None:
-                start_price, seed = seed_map.get(ticker, (100, 399))
-                idx = _date_index()
-                n = len(idx)
-                close = _random_walk(start_price, drift=0.0005, vol=0.02, n=n, seed=seed)
-                df = pd.DataFrame({"Close": close}, index=idx)
+            df = yf.Ticker(ticker).history(period="5y")
+            if df is None or df.empty:
+                _update_manifest(manifest, "semi", ticker, error="Empty response from yfinance")
+                print(f"  SKIP {label} ({ticker}): empty API response")
+                continue
 
             _save_parquet("semi", ticker, df)
             _update_manifest(manifest, "semi", ticker, df)
             print(f"  ok  {label} ({ticker}): {len(df)} rows")
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "semi", ticker, str(e))
+                print(f"  RATE LIMIT {label} ({ticker}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return
             _update_manifest(manifest, "semi", ticker, error=str(e))
             print(f"  ERR {label} ({ticker}): {e}")
 
     # --- Semi ETFs ---
     print("  -- Semi ETFs --")
-    etf_seeds = {"SMH": (220, 320), "SOXX": (480, 321)}
     for label, ticker in SEMI_ETFS.items():
         try:
-            df = None
-            if yf_available:
-                try:
-                    df = yf.Ticker(ticker).history(period="5y")
-                    if df is None or df.empty:
-                        df = None
-                except Exception as api_err:
-                    if _is_rate_limit_error(api_err) and rate_limits is not None:
-                        _record_rate_limit(rate_limits, "semi", ticker, str(api_err))
-                        print(f"  RATE LIMIT {label} ({ticker}): {api_err}")
-                        _save_rate_limits(rate_limits)
-                        print(f"  Rate limit saved. Moving to next source...")
-                        return
-                    print(f"  WARN {label} ({ticker}): API failed ({api_err}), using mock")
-                    df = None
-
-            if df is None:
-                start_price, seed = etf_seeds.get(ticker, (100, 399))
-                idx = _date_index()
-                n = len(idx)
-                close = _random_walk(start_price, drift=0.0005, vol=0.018, n=n, seed=seed)
-                df = pd.DataFrame({"Close": close}, index=idx)
+            df = yf.Ticker(ticker).history(period="5y")
+            if df is None or df.empty:
+                _update_manifest(manifest, "semi", ticker, error="Empty response from yfinance")
+                print(f"  SKIP {label} ({ticker}): empty API response")
+                continue
 
             _save_parquet("semi", ticker, df)
             _update_manifest(manifest, "semi", ticker, df)
             print(f"  ok  {label} ({ticker}): {len(df)} rows")
         except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "semi", ticker, str(e))
+                print(f"  RATE LIMIT {label} ({ticker}): {e}")
+                _save_rate_limits(rate_limits)
+                print(f"  Rate limit saved. Moving to next source...")
+                return
             _update_manifest(manifest, "semi", ticker, error=str(e))
             print(f"  ERR {label} ({ticker}): {e}")
 
-    # --- Revenue Cycle (quarterly, always mock for now) ---
-    print("  -- Revenue Cycle --")
-    quarters = pd.date_range(start="2020-01-01", end="2026-01-01", freq="QS")
-    n = len(quarters)
-    rng = np.random.RandomState(350)
-    base = 120
-    cycle = base + 30 * np.sin(np.linspace(0, 3 * np.pi, n)) + np.cumsum(rng.normal(1, 3, n))
-    df_rev = pd.DataFrame({
-        "Global Semi Revenue ($B)": cycle,
-        "QoQ Change (%)": np.concatenate([[0], np.diff(cycle) / cycle[:-1] * 100]),
-    }, index=quarters)
-    _save_parquet("semi", "revenue_cycle", df_rev)
-    _update_manifest(manifest, "semi", "revenue_cycle", df_rev)
-    print(f"  ok  Revenue cycle: {len(df_rev)} quarters")
-
-    # --- Inventory Cycle (monthly, always mock for now) ---
-    print("  -- Inventory Cycle --")
-    months = pd.date_range(start="2022-01-01", end="2026-02-01", freq="MS")
-    n = len(months)
-    btb = np.clip(_mean_reverting(1.0, vol=0.04, n=n, seed=351), 0.7, 1.4)
-    inv_days = _mean_reverting(95, vol=4, n=n, seed=352)
-    df_inv = pd.DataFrame({
-        "Book-to-Bill": btb,
-        "Inventory Days": inv_days,
-    }, index=months)
-    _save_parquet("semi", "inventory_cycle", df_inv)
-    _update_manifest(manifest, "semi", "inventory_cycle", df_inv)
-    print(f"  ok  Inventory cycle: {len(df_inv)} months")
+    # --- Revenue Cycle & Inventory Cycle ---
+    print("  -- Revenue/Inventory Cycles --")
+    print("  Skipping — no live SIA/industry API integration yet.")
+    print("  Existing Parquet files in data/semi/ are preserved.")
 
     print("[Semi] Done")
 
@@ -777,146 +511,14 @@ def ingest_semi(manifest: dict, incremental: bool = False, rate_limits: dict = N
 # ---------------------------------------------------------------------------
 
 def ingest_policy(manifest: dict, incremental: bool = False, rate_limits: dict = None):
-    """Ingest policy events, central bank calendar, tariff tracker."""
-    print("\n[Policy] Ingesting policy and geopolitical data...")
-    print("  Using curated mock data (swap for Federal Register / GDELT APIs)")
+    """Ingest policy events, central bank calendar, tariff tracker.
 
-    # --- Policy Events ---
-    events = [
-        {"date": "2025-01-15", "category": "Trade & Tariffs", "country": "US",
-         "event": "US raises Section 301 tariffs on Chinese EVs to 100%, semiconductors to 50%",
-         "impact": "Negative", "sectors": "Autos, Semiconductors",
-         "detail": "Effective Q2 2025. Targets $18B in imports. China signals retaliation on US agricultural exports."},
-        {"date": "2025-02-01", "category": "Central Bank Policy", "country": "US",
-         "event": "FOMC holds rates at 5.25-5.50%, signals patience on cuts",
-         "impact": "Neutral", "sectors": "Broad Market",
-         "detail": "Dot plot shows 2 cuts in 2025 vs market pricing of 4-5. USD strengthens on hawkish hold."},
-        {"date": "2025-02-20", "category": "Export Controls & Sanctions", "country": "US",
-         "event": "Commerce Dept expands AI chip export controls to include ASML DUV tools",
-         "impact": "Negative", "sectors": "Semiconductors, AI",
-         "detail": "New rule requires licenses for DUV lithography exports to China. ASML, LRCX, AMAT affected."},
-        {"date": "2025-03-10", "category": "Industrial Policy & Subsidies", "country": "CN",
-         "event": "China announces $47B 'Big Fund III' for domestic semiconductor capacity",
-         "impact": "Mixed", "sectors": "Semiconductors",
-         "detail": "Third phase of national IC fund. Focus on mature-node fabs and packaging."},
-        {"date": "2025-03-15", "category": "Central Bank Policy", "country": "JP",
-         "event": "BOJ raises policy rate to 0.50%, signals further normalization",
-         "impact": "Mixed", "sectors": "FX, Bonds",
-         "detail": "Yen strengthens 3% on surprise hawkish shift. Carry trade unwind risk rises."},
-        {"date": "2025-04-01", "category": "Trade & Tariffs", "country": "US",
-         "event": "US imposes 25% tariffs on steel/aluminum from all countries",
-         "impact": "Negative", "sectors": "Industrials, Construction",
-         "detail": "Universal tariff replaces country-specific exemptions. EU, Japan, Canada announce retaliation."},
-        {"date": "2025-04-20", "category": "Industrial Policy & Subsidies", "country": "US",
-         "event": "CHIPS Act Phase 2: $8B disbursed to Intel, Samsung US fabs",
-         "impact": "Positive", "sectors": "Semiconductors",
-         "detail": "Intel Arizona fab gets $5B, Samsung Taylor TX gets $3B. Production expected 2027."},
-        {"date": "2025-05-10", "category": "Capital Controls", "country": "CN",
-         "event": "PBOC tightens offshore yuan lending to defend CNY",
-         "impact": "Mixed", "sectors": "FX, EM",
-         "detail": "Squeeze on CNH short positions. Signal of capital outflow pressure."},
-        {"date": "2025-06-15", "category": "Central Bank Policy", "country": "EU",
-         "event": "ECB cuts deposit rate by 25bp to 4.25%, signals data-dependent path",
-         "impact": "Positive", "sectors": "EU Equities, Bonds",
-         "detail": "First cut of the cycle. EUR weakens modestly. EU bank stocks rally."},
-        {"date": "2025-07-01", "category": "Regulatory Change", "country": "EU",
-         "event": "EU Carbon Border Adjustment Mechanism (CBAM) full implementation",
-         "impact": "Mixed", "sectors": "Industrials, Energy, Materials",
-         "detail": "Carbon tariffs on steel, cement, aluminum, fertilizers, electricity imports."},
-        {"date": "2025-08-05", "category": "Geopolitical Event", "country": "CN",
-         "event": "China conducts large-scale military exercises near Taiwan Strait",
-         "impact": "Negative", "sectors": "Semiconductors, Defense, Shipping",
-         "detail": "Week-long exercises. TSM stock drops 8%. Shipping insurance rates triple."},
-        {"date": "2025-09-01", "category": "Trade & Tariffs", "country": "CN",
-         "event": "China restricts export of gallium, germanium, and antimony",
-         "impact": "Negative", "sectors": "Semiconductors, Defense",
-         "detail": "Critical minerals export permits required. Affects chip substrates."},
-        {"date": "2025-09-20", "category": "Central Bank Policy", "country": "US",
-         "event": "Fed cuts rates by 25bp to 5.00-5.25%, first cut of the cycle",
-         "impact": "Positive", "sectors": "Broad Market",
-         "detail": "Markets rally. Forward guidance suggests gradual easing. DXY drops 1.5%."},
-        {"date": "2025-10-15", "category": "Industrial Policy & Subsidies", "country": "US",
-         "event": "IRA: $4.5B in new clean energy tax credit allocations",
-         "impact": "Positive", "sectors": "Clean Energy, EVs, Utilities",
-         "detail": "Focus on battery manufacturing, solar panels, EV charging infrastructure."},
-        {"date": "2025-11-01", "category": "Export Controls & Sanctions", "country": "US",
-         "event": "US Treasury designates 15 Chinese entities under Russia-related sanctions",
-         "impact": "Negative", "sectors": "Banks, Trade Finance",
-         "detail": "Targets Chinese banks facilitating Russian commodity trade."},
-        {"date": "2025-12-10", "category": "Central Bank Policy", "country": "US",
-         "event": "Fed cuts rates by 25bp to 4.75-5.00%, signals 3 more cuts in 2026",
-         "impact": "Positive", "sectors": "Broad Market, Real Estate",
-         "detail": "Dovish dot plot. 10Y yield drops to 3.9%. REIT sector surges 5%."},
-        {"date": "2026-01-05", "category": "Trade & Tariffs", "country": "US",
-         "event": "New administration announces 60% tariff proposal on all Chinese goods",
-         "impact": "Negative", "sectors": "Consumer, Tech, Industrials",
-         "detail": "Phase-in over 2026. Markets sell off 3%. Supply chain diversification accelerates."},
-        {"date": "2026-01-20", "category": "Geopolitical Event", "country": "US",
-         "event": "US executive orders on energy, trade, and immigration on day one",
-         "impact": "Mixed", "sectors": "Energy, Industrials, Agriculture",
-         "detail": "Paris Agreement withdrawal, Keystone XL restart, border emergency."},
-        {"date": "2026-02-01", "category": "Central Bank Policy", "country": "US",
-         "event": "FOMC pauses rate cuts at 4.75-5.00%, cites tariff inflation risks",
-         "impact": "Negative", "sectors": "Broad Market",
-         "detail": "Hawkish pause. Market reprices terminal rate higher. 2Y yield jumps 15bp."},
-        {"date": "2026-02-05", "category": "Export Controls & Sanctions", "country": "US",
-         "event": "Commerce Dept proposes 'know your customer' rule for cloud AI compute",
-         "impact": "Mixed", "sectors": "Cloud, AI, Semiconductors",
-         "detail": "Would require cloud providers to verify end-users of AI training workloads."},
-    ]
-    df_events = pd.DataFrame(events)
-    df_events["date"] = pd.to_datetime(df_events["date"])
-    _save_parquet("policy", "events", df_events)
-    _update_manifest(manifest, "policy", "events", df_events)
-    print(f"  ok  Policy events: {len(df_events)} events")
-
-    # --- Central Bank Calendar ---
-    meetings = [
-        {"date": "2026-02-05", "bank": "RBA", "country": "AU", "current_rate": 4.35,
-         "expected_action": "Hold", "market_probability": "85% hold"},
-        {"date": "2026-03-06", "bank": "ECB", "country": "EU", "current_rate": 4.00,
-         "expected_action": "Cut 25bp", "market_probability": "70% cut"},
-        {"date": "2026-03-14", "bank": "BOJ", "country": "JP", "current_rate": 0.50,
-         "expected_action": "Hold", "market_probability": "90% hold"},
-        {"date": "2026-03-19", "bank": "FOMC", "country": "US", "current_rate": 4.875,
-         "expected_action": "Hold", "market_probability": "80% hold"},
-        {"date": "2026-03-20", "bank": "BOE", "country": "UK", "current_rate": 5.00,
-         "expected_action": "Hold", "market_probability": "75% hold"},
-        {"date": "2026-04-17", "bank": "ECB", "country": "EU", "current_rate": 4.00,
-         "expected_action": "Cut 25bp", "market_probability": "60% cut"},
-        {"date": "2026-05-07", "bank": "FOMC", "country": "US", "current_rate": 4.875,
-         "expected_action": "Cut 25bp", "market_probability": "55% cut"},
-        {"date": "2026-05-08", "bank": "BOE", "country": "UK", "current_rate": 5.00,
-         "expected_action": "Cut 25bp", "market_probability": "65% cut"},
-        {"date": "2026-06-05", "bank": "ECB", "country": "EU", "current_rate": 3.75,
-         "expected_action": "Hold", "market_probability": "70% hold"},
-        {"date": "2026-06-18", "bank": "FOMC", "country": "US", "current_rate": 4.625,
-         "expected_action": "Cut 25bp", "market_probability": "60% cut"},
-    ]
-    df_cb = pd.DataFrame(meetings)
-    df_cb["date"] = pd.to_datetime(df_cb["date"])
-    _save_parquet("policy", "cb_calendar", df_cb)
-    _update_manifest(manifest, "policy", "cb_calendar", df_cb)
-    print(f"  ok  CB calendar: {len(df_cb)} meetings")
-
-    # --- Tariff Tracker ---
-    tariff_data = {
-        "Target": ["China", "China", "EU", "Japan", "Canada", "Mexico", "S. Korea", "India", "China", "All"],
-        "Sector": ["Semiconductors", "EVs & Batteries", "Steel & Aluminum", "Autos", "Steel & Aluminum",
-                    "Autos (pending)", "Steel", "Electronics", "Consumer Goods", "Baseline MFN"],
-        "US Tariff Rate (%)": [50, 100, 25, 2.5, 25, 25, 25, 3.5, 25, 3.4],
-        "Pre-2025 Rate (%)": [25, 27.5, 0, 2.5, 0, 0, 0, 3.5, 7.5, 3.4],
-        "Effective Date": ["2025-06-01", "2025-06-01", "2025-04-01", "Unchanged", "2025-04-01",
-                          "Proposed", "2025-04-01", "Unchanged", "2025-01-15", "N/A"],
-        "Retaliation": ["Yes - Ag", "Yes - Ag", "Yes - Bourbon, Harley", "None", "Yes - Dairy",
-                        "TBD", "None", "None", "Yes - LNG", "N/A"],
-    }
-    df_tariff = pd.DataFrame(tariff_data)
-    _save_parquet("policy", "tariff_tracker", df_tariff)
-    _update_manifest(manifest, "policy", "tariff_tracker", df_tariff)
-    print(f"  ok  Tariff tracker: {len(df_tariff)} entries")
-
-    print("[Policy] Done")
+    NOTE: Requires real API integration (Federal Register, GDELT, etc.).
+    Currently no live API is integrated. Existing Parquet files are preserved.
+    """
+    print("\n[Policy] Skipping — no live policy API integration yet.")
+    print("  Existing Parquet files in data/policy/ are preserved.")
+    print("  To add: implement Federal Register / GDELT API clients here.")
 
 
 # ---------------------------------------------------------------------------
