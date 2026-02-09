@@ -49,7 +49,7 @@ Finished in 12.5s — 84 ok, 0 errors
 Manifest saved to data/manifest.json
 ```
 
-**Note:** Sources without live API integration (IMF, policy) will be skipped. Install required packages and set API keys for full ingestion.
+**Note:** FRED requires `FRED_API_KEY` in `.env`. IMF, World Bank, Federal Register, and yfinance APIs need no authentication.
 
 ### `--update` — Incremental Update
 
@@ -118,9 +118,9 @@ python ingestor.py --clean
 | `fred` | `data/fred/` | 21 | FRED API (needs `FRED_API_KEY`) | Requires API key |
 | `world_bank` | `data/world_bank/` | 12 | wbgapi (no key needed) | Ready |
 | `market` | `data/market/` | ~32 | yfinance (no key needed) | Ready |
-| `imf` | `data/imf/` | 2 | IMF API (not yet integrated) | Needs implementation |
+| `imf` | `data/imf/` | 2 | IMF SDMX JSON API (no key needed) | Ready |
 | `semi` | `data/semi/` | ~15 | yfinance for stocks/ETFs | Stocks ready; cycles need SIA API |
-| `policy` | `data/policy/` | 3 | Federal Register / GDELT (not yet integrated) | Needs implementation |
+| `policy` | `data/policy/` | 3 | Federal Register API (no key needed) | Ready |
 
 ## Parquet File Format
 
