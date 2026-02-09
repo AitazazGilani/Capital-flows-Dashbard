@@ -246,9 +246,9 @@ def ingest_world_bank(manifest: dict, incremental: bool = False, rate_limits: di
     ok, fail = 0, 0
     for ind_name, ind_code in WB_INDICATORS.items():
         try:
-            raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=range(2020, 2026))
+            raw = wb.data.DataFrame(ind_code, economy=wb_codes, time=[f"YR{y}" for y in range(2020, 2026)])
             df = raw.T
-            df.index = df.index.astype(int)
+            df.index = df.index.str.replace("YR", "", regex=False).astype(int)
 
             if df is None or df.empty:
                 _update_manifest(manifest, "world_bank", ind_code, error="Empty response from API")
