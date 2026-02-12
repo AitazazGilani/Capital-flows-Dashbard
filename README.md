@@ -1,4 +1,4 @@
-# Macro Dashboard MVP
+# Macro Dashboard
 
 A Streamlit dashboard for tracking global macro indicators, capital flows, and market data. Includes an AI chat sidebar powered by Claude for contextual analysis. Primary goal: understand capital flows and macro catalysts to drive investment decisions.
 
