@@ -7,7 +7,7 @@ import streamlit as st
 import pandas as pd
 from src.config import COUNTRIES, WB_INDICATORS
 from src.data_fetcher import (
-    get_wb_indicator, get_fx_rates, get_imf_gold_reserves,
+    get_wb_indicator, get_fx_rates, get_imf_gold_reserves, get_bis_reer,
 )
 from src.chart_helpers import (
     line_chart, bar_chart, grouped_bar_chart, sortable_table, metric_row,
@@ -116,6 +116,32 @@ if gold_data:
                   color_positive="#FFD700", color_negative="#FFD700"),
         use_container_width=True,
     )
+
+st.divider()
+
+# --- Real Effective Exchange Rates (BIS REER) ---
+st.subheader("Real Effective Exchange Rates (BIS)")
+with st.spinner("Loading REER data..."):
+    reer_data = {}
+    for c in selected:
+        reer_df = get_bis_reer(c)
+        if not reer_df.empty and "REER" in reer_df.columns:
+            reer_data[c] = reer_df["REER"]
+
+if reer_data:
+    reer_combined = pd.DataFrame(reer_data)
+    st.plotly_chart(
+        line_chart(reer_combined, "Real Effective Exchange Rate (100 = base period)",
+                   yaxis_title="REER Index"),
+        use_container_width=True,
+    )
+    st.caption(
+        "REER adjusts nominal exchange rates for CPI differentials. "
+        "Rising REER = currency appreciating in real terms (losing competitiveness). "
+        "More useful than nominal FX for capital flow analysis."
+    )
+else:
+    st.info("BIS REER data not available. Run `python ingestor.py --source bis` to ingest.")
 
 st.divider()
 

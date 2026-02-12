@@ -127,88 +127,95 @@ with st.spinner("Loading industry cycle data..."):
     revenue_cycle = get_semi_revenue_cycle()
     inventory_cycle = get_semi_inventory_cycle()
 
-col1, col2 = st.columns(2)
+if not revenue_cycle.empty and not inventory_cycle.empty:
+    col1, col2 = st.columns(2)
 
-with col1:
-    st.markdown("**Global Semi Revenue (Quarterly)**")
-    fig_rev = go.Figure()
-    fig_rev.add_trace(go.Bar(
-        x=revenue_cycle.index,
-        y=revenue_cycle["Global Semi Revenue ($B)"],
-        name="Revenue ($B)",
-        marker_color=COLORS[0],
-    ))
-    fig_rev.add_trace(go.Scatter(
-        x=revenue_cycle.index,
-        y=revenue_cycle["QoQ Change (%)"],
-        name="QoQ Change (%)",
-        mode="lines+markers",
-        line=dict(color=COLORS[1], width=2),
-        yaxis="y2",
-    ))
-    fig_rev.update_layout(
-        title="Global Semiconductor Revenue",
-        height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
-        yaxis=dict(title="Revenue ($B)"),
-        yaxis2=dict(title="QoQ %", side="right", overlaying="y"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    st.plotly_chart(fig_rev, use_container_width=True)
-    st.caption("Source: SIA (Semiconductor Industry Association) — free quarterly reports")
+    with col1:
+        st.markdown("**Global Semi Revenue (Quarterly)**")
+        fig_rev = go.Figure()
+        fig_rev.add_trace(go.Bar(
+            x=revenue_cycle.index,
+            y=revenue_cycle["Global Semi Revenue ($B)"],
+            name="Revenue ($B)",
+            marker_color=COLORS[0],
+        ))
+        fig_rev.add_trace(go.Scatter(
+            x=revenue_cycle.index,
+            y=revenue_cycle["QoQ Change (%)"],
+            name="QoQ Change (%)",
+            mode="lines+markers",
+            line=dict(color=COLORS[1], width=2),
+            yaxis="y2",
+        ))
+        fig_rev.update_layout(
+            title="Global Semiconductor Revenue",
+            height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+            yaxis=dict(title="Revenue ($B)"),
+            yaxis2=dict(title="QoQ %", side="right", overlaying="y"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_rev, use_container_width=True)
+        st.caption("Source: ISM PMI proxy for semiconductor revenue cycle")
 
-with col2:
-    st.markdown("**Book-to-Bill & Inventory**")
-    fig_inv = go.Figure()
-    fig_inv.add_trace(go.Scatter(
-        x=inventory_cycle.index,
-        y=inventory_cycle["Book-to-Bill"],
-        name="Book-to-Bill",
-        mode="lines",
-        line=dict(color=COLORS[2], width=2),
-    ))
-    fig_inv.add_hline(y=1.0, line_dash="dash", line_color="yellow",
-                      annotation_text="Expansion/Contraction", annotation_position="right")
-    fig_inv.add_trace(go.Scatter(
-        x=inventory_cycle.index,
-        y=inventory_cycle["Inventory Days"],
-        name="Inventory Days",
-        mode="lines",
-        line=dict(color=COLORS[3], width=2),
-        yaxis="y2",
-    ))
-    fig_inv.update_layout(
-        title="Semi Book-to-Bill & Inventory Days",
-        height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
-        yaxis=dict(title="Book-to-Bill Ratio"),
-        yaxis2=dict(title="Inventory Days", side="right", overlaying="y"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    st.plotly_chart(fig_inv, use_container_width=True)
-    st.caption("Book-to-Bill > 1.0 = orders exceeding shipments (expansion). High inventory days = glut risk.")
+    with col2:
+        st.markdown("**Book-to-Bill & Inventory**")
+        fig_inv = go.Figure()
+        fig_inv.add_trace(go.Scatter(
+            x=inventory_cycle.index,
+            y=inventory_cycle["Book-to-Bill"],
+            name="Book-to-Bill",
+            mode="lines",
+            line=dict(color=COLORS[2], width=2),
+        ))
+        fig_inv.add_hline(y=1.0, line_dash="dash", line_color="yellow",
+                          annotation_text="Expansion/Contraction", annotation_position="right")
+        if "Inventory Days" in inventory_cycle.columns:
+            fig_inv.add_trace(go.Scatter(
+                x=inventory_cycle.index,
+                y=inventory_cycle["Inventory Days"],
+                name="Inventory Days",
+                mode="lines",
+                line=dict(color=COLORS[3], width=2),
+                yaxis="y2",
+            ))
+        fig_inv.update_layout(
+            title="Semi Book-to-Bill & Inventory Days",
+            height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+            yaxis=dict(title="Book-to-Bill Ratio"),
+            yaxis2=dict(title="Inventory Days", side="right", overlaying="y"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_inv, use_container_width=True)
+        st.caption("Book-to-Bill > 1.0 = orders exceeding shipments (expansion). High inventory days = glut risk.")
 
-# Cycle interpretation
-btb_last = inventory_cycle["Book-to-Bill"].iloc[-1]
-inv_last = inventory_cycle["Inventory Days"].iloc[-1]
+    # Cycle interpretation
+    btb_last = inventory_cycle["Book-to-Bill"].iloc[-1]
+    inv_last = inventory_cycle["Inventory Days"].iloc[-1] if "Inventory Days" in inventory_cycle.columns else 85.0
 
-if btb_last > 1.05 and inv_last < 90:
-    cycle_phase = "Early Upcycle"
-    cycle_color = "green"
-    cycle_desc = "Orders are outpacing shipments while inventories are lean. Best phase for semi stocks."
-elif btb_last > 1.0 and inv_last > 100:
-    cycle_phase = "Late Upcycle"
-    cycle_color = "orange"
-    cycle_desc = "Demand still positive but inventories building. Watch for order corrections."
-elif btb_last < 1.0 and inv_last > 100:
-    cycle_phase = "Downcycle"
-    cycle_color = "red"
-    cycle_desc = "Orders below shipments with elevated inventory. Semi stocks typically bottom before B2B troughs."
+    if btb_last > 1.05 and inv_last < 90:
+        cycle_phase = "Early Upcycle"
+        cycle_color = "green"
+        cycle_desc = "Orders are outpacing shipments while inventories are lean. Best phase for semi stocks."
+    elif btb_last > 1.0 and inv_last > 100:
+        cycle_phase = "Late Upcycle"
+        cycle_color = "orange"
+        cycle_desc = "Demand still positive but inventories building. Watch for order corrections."
+    elif btb_last < 1.0 and inv_last > 100:
+        cycle_phase = "Downcycle"
+        cycle_color = "red"
+        cycle_desc = "Orders below shipments with elevated inventory. Semi stocks typically bottom before B2B troughs."
+    else:
+        cycle_phase = "Recovery"
+        cycle_color = "blue"
+        cycle_desc = "Inventories normalizing, B2B stabilizing. Early positioning opportunity."
+
+    st.markdown(f"**Current cycle phase:** :{cycle_color}[{cycle_phase}]")
+    st.markdown(f"*{cycle_desc}*")
 else:
-    cycle_phase = "Recovery"
-    cycle_color = "blue"
-    cycle_desc = "Inventories normalizing, B2B stabilizing. Early positioning opportunity."
-
-st.markdown(f"**Current cycle phase:** :{cycle_color}[{cycle_phase}]")
-st.markdown(f"*{cycle_desc}*")
+    st.info("Semi cycle data not available. Run `python ingestor.py --source semi` with FRED_API_KEY to ingest ISM-based proxy data.")
+    cycle_phase = "N/A"
+    btb_last = 0
+    inv_last = 0
 
 st.divider()
 

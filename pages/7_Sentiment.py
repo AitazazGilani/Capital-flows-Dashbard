@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 from src.config import FRED
-from src.data_fetcher import get_volatility, get_commodities, get_fred_series
+from src.data_fetcher import get_volatility, get_commodities, get_fred_series, get_cot_data, get_epu_index, get_gpr_index
 from src.chart_helpers import line_chart, dual_axis_chart, metric_row, CHART_TEMPLATE, CHART_MARGINS, CHART_FONT, COLORS
 from src.processors import compute_copper_gold_ratio
 
@@ -124,10 +124,126 @@ metric_row([
     {"label": "vs Average", "value": f"{((sent_last / hist_avg) - 1) * 100:+.1f}%"},
 ])
 
+st.divider()
+
+# --- CFTC COT Positioning ---
+st.subheader("Futures Positioning (CFTC COT)")
+
+cot_fx = get_cot_data("fx")
+cot_rates = get_cot_data("rates")
+cot_commodities = get_cot_data("commodities")
+
+if not cot_fx.empty or not cot_rates.empty or not cot_commodities.empty:
+    cot_tab1, cot_tab2, cot_tab3 = st.tabs(["FX", "Rates", "Commodities"])
+
+    for tab, cot_df, label in [
+        (cot_tab1, cot_fx, "FX"),
+        (cot_tab2, cot_rates, "Rates"),
+        (cot_tab3, cot_commodities, "Commodities"),
+    ]:
+        with tab:
+            if not cot_df.empty:
+                # Show latest net positioning per contract
+                latest = cot_df.sort_values("date").groupby("contract").last().reset_index()
+                fig_cot = go.Figure(go.Bar(
+                    x=latest["contract"],
+                    y=latest["net"],
+                    marker_color=[COLORS[2] if v > 0 else COLORS[1] for v in latest["net"]],
+                    text=[f"{v:,.0f}" for v in latest["net"]],
+                    textposition="outside",
+                ))
+                fig_cot.update_layout(
+                    title=f"{label} Net Speculative Positioning",
+                    height=350, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+                    yaxis_title="Net Contracts (Long - Short)",
+                )
+                st.plotly_chart(fig_cot, use_container_width=True)
+
+                # Show % long for context
+                st.dataframe(
+                    latest[["contract", "long", "short", "net", "pct_long"]].rename(columns={
+                        "contract": "Contract", "long": "Long", "short": "Short",
+                        "net": "Net", "pct_long": "% Long",
+                    }).set_index("Contract"),
+                    use_container_width=True,
+                )
+            else:
+                st.info(f"No {label} COT data available.")
+
+    st.caption(
+        "Source: CFTC Commitments of Traders (Legacy Futures). "
+        "Net = Non-commercial long - short. Extreme positioning often precedes reversals."
+    )
+else:
+    st.info("CFTC COT data not available. Run `python ingestor.py --source cftc` to ingest.")
+
+st.divider()
+
+# --- Geopolitical & Policy Uncertainty ---
+st.subheader("Geopolitical & Policy Risk")
+
+epu = get_epu_index()
+gpr_df = get_gpr_index()
+
+col1, col2 = st.columns(2)
+
+with col1:
+    if not epu.empty:
+        epu_frame = epu.to_frame(name="EPU Index")
+        fig_epu = go.Figure()
+        fig_epu.add_trace(go.Scatter(
+            x=epu.index, y=epu.values,
+            name="EPU", mode="lines",
+            line=dict(color=COLORS[3], width=1.5),
+            fill="tozeroy", fillcolor="rgba(171, 99, 250, 0.1)",
+        ))
+        epu_avg = epu.mean()
+        fig_epu.add_hline(y=epu_avg, line_dash="dash", line_color="yellow",
+                          annotation_text=f"Avg ({epu_avg:.0f})", annotation_position="right")
+        fig_epu.update_layout(
+            title="Economic Policy Uncertainty Index (US)",
+            height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+            yaxis_title="EPU Index",
+            hovermode="x unified",
+        )
+        st.plotly_chart(fig_epu, use_container_width=True)
+    else:
+        st.info("EPU Index not available. Ingest FRED data with FRED_API_KEY.")
+
+with col2:
+    if not gpr_df.empty:
+        gpr_series = gpr_df["GPR"] if "GPR" in gpr_df.columns else gpr_df.iloc[:, 0]
+        fig_gpr = go.Figure()
+        fig_gpr.add_trace(go.Scatter(
+            x=gpr_df.index, y=gpr_series.values,
+            name="GPR", mode="lines",
+            line=dict(color=COLORS[1], width=1.5),
+            fill="tozeroy", fillcolor="rgba(239, 85, 59, 0.1)",
+        ))
+        gpr_avg = gpr_series.mean()
+        fig_gpr.add_hline(y=gpr_avg, line_dash="dash", line_color="yellow",
+                          annotation_text=f"Avg ({gpr_avg:.0f})", annotation_position="right")
+        fig_gpr.update_layout(
+            title="Geopolitical Risk Index (Caldara-Iacoviello)",
+            height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+            yaxis_title="GPR Index",
+            hovermode="x unified",
+        )
+        st.plotly_chart(fig_gpr, use_container_width=True)
+    else:
+        st.info("GPR Index not available. Run `python ingestor.py --source fred` to ingest.")
+
+st.caption(
+    "EPU measures newspaper coverage of policy-related economic uncertainty. "
+    "GPR measures geopolitical threats and actions. Spikes in both often precede risk-off moves."
+)
+
 # Store summary for Claude
 st.session_state.sentiment_summary = {
     "vix": f"{vix_last:.1f} ({vix_pctile:.0f}th percentile)",
     "move": f"{vol_data['MOVE'].iloc[-1]:.1f}",
     "copper_gold_ratio": f"{ratio.iloc[-1]:.3f}",
     "consumer_sentiment": f"{sent_last:.1f} ({sent_pctile:.0f}th percentile)",
+    "epu": f"{epu.iloc[-1]:.0f}" if not epu.empty else "N/A",
+    "gpr": f"{gpr_df.iloc[-1, 0]:.0f}" if not gpr_df.empty else "N/A",
 }

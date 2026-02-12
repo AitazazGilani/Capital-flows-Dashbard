@@ -97,11 +97,14 @@ with col2:
     st.subheader("Baltic Dry Index")
     with st.spinner("Loading BDI data..."):
         comm_data = get_commodities()
-    bdi_df = comm_data[["BDI"]]
-    st.plotly_chart(
-        line_chart(bdi_df, "Baltic Dry Index"),
-        use_container_width=True,
-    )
+    if "BDI" in comm_data.columns:
+        bdi_df = comm_data[["BDI"]]
+        st.plotly_chart(
+            line_chart(bdi_df, "Baltic Dry Index"),
+            use_container_width=True,
+        )
+    else:
+        st.info("BDI data not available. Run `python ingestor.py --source market` to ingest.")
 
 st.divider()
 
