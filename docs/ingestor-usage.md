@@ -217,6 +217,75 @@ def get_some_data(period="5y"):
 
 The ingestor must be run to populate data before the dashboard shows content.
 
+## Planned Integrations
+
+The following integrations are not yet built but would close the biggest data gaps in the dashboard. Listed in priority order by ROI.
+
+### 1. Semiconductor Industry Cycle Data — Pages 10 (Strategic Sectors)
+
+**Gap:** Revenue cycle and inventory cycle charts are empty. Cycle phase analysis doesn't work.
+
+| Integration | API / Source | Auth | What it provides |
+|-------------|-------------|------|------------------|
+| SIA Global Chip Sales | `semiconductors.org` monthly reports | Scrape or manual CSV | Monthly worldwide semiconductor revenue for revenue cycle chart |
+| ISM Manufacturing PMI | FRED series `NAPMPI` (prices) / `MANEMP` (employment) | `FRED_API_KEY` | Proxy for inventory/B2B cycle when SIA data unavailable |
+
+**Parquet targets:** `data/semi/revenue_cycle.parquet`, `data/semi/inventory_cycle.parquet`
+
+### 2. Yield Curve Snapshot & Fed Funds Futures — Page 3 (Rates & Credit)
+
+**Gap:** Yield curve chart and implied rate path table show "data not available".
+
+| Integration | API / Source | Auth | What it provides |
+|-------------|-------------|------|------------------|
+| US Treasury Yield Curve | `api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/avg_interest_rates` | None | Daily yields across maturities (1M–30Y) for curve snapshot |
+| CME FedWatch proxy | Derive from FRED `DFF` + eurodollar/SOFR futures via yfinance | None | Implied fed funds rate path for next 6–8 meetings |
+
+**Parquet targets:** `data/fred/yield_curve_snapshot.parquet`, `data/fred/fed_funds_futures.parquet`
+
+### 3. BIS Real Effective Exchange Rates (REER) — Pages 5, 6 (Capital Flows, Country Risk)
+
+**Gap:** No inflation-adjusted FX view. Nominal FX alone is misleading for capital flow analysis.
+
+| Integration | API / Source | Auth | What it provides |
+|-------------|-------------|------|------------------|
+| BIS REER (Broad) | `stats.bis.org/api/v2` (SDMX REST) | None | Monthly REER indices for all major economies, adjusts for CPI differentials |
+
+**Parquet targets:** `data/bis/reer_{country}.parquet`
+
+### 4. Baltic Dry Index (BDI) — Page 4 (Economy)
+
+**Gap:** Economy page references BDI but it's missing from the commodities ticker list, causing a KeyError.
+
+| Integration | API / Source | Auth | What it provides |
+|-------------|-------------|------|------------------|
+| BDI | yfinance ticker `^BDI` | None | Global shipping demand proxy — leading indicator for trade volumes |
+
+**Fix:** Add `^BDI` to `MARKET_TICKERS` commodities list in `src/config.py` and re-run `python ingestor.py --source market`.
+
+### 5. CFTC Commitments of Traders (COT) — Page 7 (Sentiment)
+
+**Gap:** No futures positioning data. COT is a widely-used sentiment/positioning signal.
+
+| Integration | API / Source | Auth | What it provides |
+|-------------|-------------|------|------------------|
+| CFTC COT Reports | `publicreporting.cftc.gov` weekly CSV/API | None | Net speculative positioning in FX, rates, and commodity futures |
+
+**Parquet targets:** `data/cftc/cot_fx.parquet`, `data/cftc/cot_rates.parquet`, `data/cftc/cot_commodities.parquet`
+
+### 6. Geopolitical / Policy Uncertainty Indices — Pages 7, 8 (Sentiment, Cross-Asset)
+
+**Gap:** No geopolitical risk overlay on sentiment or cross-asset pages.
+
+| Integration | API / Source | Auth | What it provides |
+|-------------|-------------|------|------------------|
+| Economic Policy Uncertainty | FRED series `USEPUINDXD` | `FRED_API_KEY` | Daily US policy uncertainty index |
+| Caldara-Iacoviello GPR Index | `matteoiacoviello.com/gpr.asp` (monthly CSV download) | None | Global geopolitical risk index (wars, terror, tensions) |
+
+**Parquet targets:** `data/fred/USEPUINDXD.parquet`, `data/policy/gpr_index.parquet`
+
+---
+
 ## Troubleshooting
 
 **"No data ingested yet"** — Run `python ingestor.py --full`
