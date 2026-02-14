@@ -1,87 +1,87 @@
 {
   "fred/DFF": {
-    "last_updated": "2026-02-08T20:57:30.403160",
+    "last_updated": "2026-02-13T22:19:26.067974",
     "status": "ok",
-    "rows": 2228,
+    "rows": 2235,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-05 00:00:00"
+      "2026-02-12 00:00:00"
     ]
   },
   "fred/DGS10": {
-    "last_updated": "2026-02-08T20:57:30.895887",
+    "last_updated": "2026-02-13T22:19:26.373132",
     "status": "ok",
-    "rows": 1592,
+    "rows": 1597,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-05 00:00:00"
+      "2026-02-12 00:00:00"
     ]
   },
   "fred/DGS2": {
-    "last_updated": "2026-02-08T20:57:31.470768",
+    "last_updated": "2026-02-13T22:19:26.671637",
     "status": "ok",
-    "rows": 1592,
+    "rows": 1597,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-05 00:00:00"
+      "2026-02-12 00:00:00"
     ]
   },
   "fred/T10Y2Y": {
-    "last_updated": "2026-02-08T20:57:32.087995",
+    "last_updated": "2026-02-13T22:19:27.057777",
     "status": "ok",
-    "rows": 1593,
+    "rows": 1598,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-06 00:00:00"
+      "2026-02-13 00:00:00"
     ]
   },
   "fred/DFII10": {
-    "last_updated": "2026-02-08T20:57:32.620696",
+    "last_updated": "2026-02-13T22:19:27.441515",
     "status": "ok",
-    "rows": 1592,
+    "rows": 1597,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-05 00:00:00"
+      "2026-02-12 00:00:00"
     ]
   },
   "fred/T10YIE": {
-    "last_updated": "2026-02-08T20:57:33.322856",
+    "last_updated": "2026-02-13T22:19:27.831688",
     "status": "ok",
-    "rows": 1593,
+    "rows": 1598,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-06 00:00:00"
+      "2026-02-13 00:00:00"
     ]
   },
   "fred/WALCL": {
-    "last_updated": "2026-02-08T20:57:33.689567",
+    "last_updated": "2026-02-13T22:19:28.471461",
     "status": "ok",
-    "rows": 319,
+    "rows": 320,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-04 00:00:00"
+      "2026-02-11 00:00:00"
     ]
   },
   "fred/RRPONTSYD": {
-    "last_updated": "2026-02-08T20:57:34.370742",
+    "last_updated": "2026-02-13T22:19:29.760399",
     "status": "ok",
-    "rows": 1593,
+    "rows": 1598,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-06 00:00:00"
+      "2026-02-13 00:00:00"
     ]
   },
   "fred/WTREGEN": {
-    "last_updated": "2026-02-08T20:57:34.782107",
+    "last_updated": "2026-02-13T22:19:30.028180",
     "status": "ok",
-    "rows": 319,
+    "rows": 320,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-04 00:00:00"
+      "2026-02-11 00:00:00"
     ]
   },
   "fred/WM2NS": {
-    "last_updated": "2026-02-08T20:57:35.125412",
+    "last_updated": "2026-02-13T22:19:30.295375",
     "status": "ok",
     "rows": 314,
     "date_range": [
@@ -90,34 +90,43 @@
     ]
   },
   "fred/BAMLH0A0HYM2": {
-    "last_updated": "2026-02-08T20:57:35.770972",
+    "last_updated": "2026-02-13T22:19:30.573940",
     "status": "ok",
-    "rows": 1613,
+    "rows": 1618,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-05 00:00:00"
+      "2026-02-12 00:00:00"
     ]
   },
   "fred/BAMLC0A0CM": {
-    "last_updated": "2026-02-08T20:57:36.524927",
+    "last_updated": "2026-02-13T22:19:31.886427",
     "status": "ok",
-    "rows": 1613,
+    "rows": 1618,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2026-02-05 00:00:00"
+      "2026-02-12 00:00:00"
     ]
   },
   "fred/NFCI": {
-    "last_updated": "2026-02-08T20:57:37.014545",
+    "last_updated": "2026-02-13T22:19:32.233081",
     "status": "ok",
-    "rows": 318,
+    "rows": 319,
     "date_range": [
       "2020-01-03 00:00:00",
-      "2026-01-30 00:00:00"
+      "2026-02-06 00:00:00"
     ]
   },
   "fred/ICSA": {
-    "last_updated": "2026-02-08T20:57:37.405061",
+    "last_updated": "2026-02-13T22:19:32.511874",
+    "status": "ok",
+    "rows": 319,
+    "date_range": [
+      "2020-01-04 00:00:00",
+      "2026-02-07 00:00:00"
+    ]
+  },
+  "fred/CCSA": {
+    "last_updated": "2026-02-13T22:19:34.388363",
     "status": "ok",
     "rows": 318,
     "date_range": [
@@ -125,17 +134,8 @@
       "2026-01-31 00:00:00"
     ]
   },
-  "fred/CCSA": {
-    "last_updated": "2026-02-08T20:57:37.722044",
-    "status": "ok",
-    "rows": 317,
-    "date_range": [
-      "2020-01-04 00:00:00",
-      "2026-01-24 00:00:00"
-    ]
-  },
   "fred/UMCSENT": {
-    "last_updated": "2026-02-08T20:57:37.974044",
+    "last_updated": "2026-02-13T22:19:35.410318",
     "status": "ok",
     "rows": 72,
     "date_range": [
@@ -144,25 +144,25 @@
     ]
   },
   "fred/CPIAUCSL": {
-    "last_updated": "2026-02-08T20:57:38.249570",
+    "last_updated": "2026-02-13T22:19:35.668104",
     "status": "ok",
-    "rows": 72,
+    "rows": 73,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2025-12-01 00:00:00"
+      "2026-01-01 00:00:00"
     ]
   },
   "fred/UNRATE": {
-    "last_updated": "2026-02-08T20:57:38.563539",
+    "last_updated": "2026-02-13T22:19:35.954388",
     "status": "ok",
-    "rows": 72,
+    "rows": 73,
     "date_range": [
       "2020-01-01 00:00:00",
-      "2025-12-01 00:00:00"
+      "2026-01-01 00:00:00"
     ]
   },
   "fred/PSAVERT": {
-    "last_updated": "2026-02-08T20:57:38.877891",
+    "last_updated": "2026-02-13T22:19:36.231507",
     "status": "ok",
     "rows": 71,
     "date_range": [
@@ -171,7 +171,7 @@
     ]
   },
   "fred/INDPRO": {
-    "last_updated": "2026-02-08T20:57:39.404606",
+    "last_updated": "2026-02-13T22:19:36.530641",
     "status": "ok",
     "rows": 72,
     "date_range": [
@@ -180,7 +180,7 @@
     ]
   },
   "fred/USALOLITONOSTSAM": {
-    "last_updated": "2026-02-08T20:57:39.806407",
+    "last_updated": "2026-02-13T22:19:37.912511",
     "status": "ok",
     "rows": 49,
     "date_range": [
@@ -189,7 +189,7 @@
     ]
   },
   "world_bank/BN.CAB.XOKA.GD.ZS": {
-    "last_updated": "2026-02-08T21:16:31.803568",
+    "last_updated": "2026-02-13T22:20:00.216859",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -198,7 +198,7 @@
     ]
   },
   "world_bank/NE.RSB.GNFS.CD": {
-    "last_updated": "2026-02-08T21:17:06.292928",
+    "last_updated": "2026-02-13T22:20:00.978394",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -207,7 +207,7 @@
     ]
   },
   "world_bank/BX.KLT.DINV.CD.WD": {
-    "last_updated": "2026-02-08T21:17:22.092617",
+    "last_updated": "2026-02-13T22:20:01.774158",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -216,7 +216,7 @@
     ]
   },
   "world_bank/BM.KLT.DINV.CD.WD": {
-    "last_updated": "2026-02-08T21:17:22.985537",
+    "last_updated": "2026-02-13T22:20:02.562929",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -225,7 +225,7 @@
     ]
   },
   "world_bank/FI.RES.TOTL.CD": {
-    "last_updated": "2026-02-08T21:17:23.879824",
+    "last_updated": "2026-02-13T22:20:03.296796",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -234,7 +234,7 @@
     ]
   },
   "world_bank/DT.DOD.DECT.CD": {
-    "last_updated": "2026-02-08T21:17:25.347355",
+    "last_updated": "2026-02-13T22:20:04.047566",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -243,7 +243,7 @@
     ]
   },
   "world_bank/GC.DOD.TOTL.GD.ZS": {
-    "last_updated": "2026-02-08T21:17:26.269558",
+    "last_updated": "2026-02-13T22:20:04.810775",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -252,12 +252,12 @@
     ]
   },
   "world_bank/GC.BAL.CASH.GD.ZS": {
-    "last_updated": "2026-02-08T21:17:26.925374",
+    "last_updated": "2026-02-13T22:20:05.504676",
     "status": "error",
     "error": "APIError: JSON decoding error (https://api.worldbank.org/v2/en/sources/2/series/GC.BAL.CASH.GD.ZS/country/USA;EMU;GBR;JPN;CHN;CAN;AUS;CHE;KOR;IND;BRA;MEX;DEU/time/YR2020;YR2021;YR2022;YR2023;YR2024;YR2025?per_page=1000&page=1&format=json)"
   },
   "world_bank/NY.GDP.MKTP.CD": {
-    "last_updated": "2026-02-08T21:17:27.753436",
+    "last_updated": "2026-02-13T22:20:06.260853",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -266,7 +266,7 @@
     ]
   },
   "world_bank/NY.GDP.MKTP.KD.ZG": {
-    "last_updated": "2026-02-08T21:17:28.789993",
+    "last_updated": "2026-02-13T22:20:07.141489",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -275,7 +275,7 @@
     ]
   },
   "world_bank/FP.CPI.TOTL.ZG": {
-    "last_updated": "2026-02-08T21:17:29.716208",
+    "last_updated": "2026-02-13T22:20:07.976517",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -284,7 +284,7 @@
     ]
   },
   "world_bank/SL.UEM.TOTL.ZS": {
-    "last_updated": "2026-02-08T21:17:30.553831",
+    "last_updated": "2026-02-13T22:20:08.806690",
     "status": "ok",
     "rows": 5,
     "date_range": [
@@ -293,399 +293,565 @@
     ]
   },
   "market/^GSPC": {
-    "last_updated": "2026-02-08T20:57:57.592149",
+    "last_updated": "2026-02-13T22:20:08.961215",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/^STOXX50E": {
-    "last_updated": "2026-02-08T20:57:57.747631",
+    "last_updated": "2026-02-13T22:20:09.046628",
     "status": "ok",
     "rows": 1258,
     "date_range": [
-      "2021-02-08 00:00:00+01:00",
-      "2026-02-06 00:00:00+01:00"
+      "2021-02-15 00:00:00+01:00",
+      "2026-02-13 00:00:00+01:00"
     ]
   },
   "market/^FTSE": {
-    "last_updated": "2026-02-08T20:57:57.899293",
+    "last_updated": "2026-02-13T22:20:09.132644",
     "status": "ok",
     "rows": 1262,
     "date_range": [
-      "2021-02-08 00:00:00+00:00",
-      "2026-02-06 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/^N225": {
-    "last_updated": "2026-02-08T20:57:58.077333",
+    "last_updated": "2026-02-13T22:20:09.213970",
     "status": "ok",
     "rows": 1223,
     "date_range": [
-      "2021-02-09 00:00:00+09:00",
-      "2026-02-09 00:00:00+09:00"
+      "2021-02-15 00:00:00+09:00",
+      "2026-02-13 00:00:00+09:00"
     ]
   },
   "market/000001.SS": {
-    "last_updated": "2026-02-08T20:57:58.252937",
+    "last_updated": "2026-02-13T22:20:09.300473",
     "status": "ok",
-    "rows": 1212,
+    "rows": 1214,
     "date_range": [
-      "2021-02-09 00:00:00+08:00",
-      "2026-02-09 00:00:00+08:00"
+      "2021-02-18 00:00:00+08:00",
+      "2026-02-13 00:00:00+08:00"
     ]
   },
   "market/^GSPTSE": {
-    "last_updated": "2026-02-08T20:57:58.441689",
+    "last_updated": "2026-02-13T22:20:09.387562",
     "status": "ok",
     "rows": 1255,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/^AXJO": {
-    "last_updated": "2026-02-08T20:57:58.626098",
+    "last_updated": "2026-02-13T22:20:09.473967",
     "status": "ok",
     "rows": 1265,
     "date_range": [
-      "2021-02-09 00:00:00+11:00",
-      "2026-02-09 00:00:00+11:00"
+      "2021-02-15 00:00:00+11:00",
+      "2026-02-13 00:00:00+11:00"
     ]
   },
   "market/^SSMI": {
-    "last_updated": "2026-02-08T20:57:58.804049",
+    "last_updated": "2026-02-13T22:20:09.561210",
     "status": "ok",
     "rows": 1248,
     "date_range": [
-      "2021-02-08 00:00:00+01:00",
-      "2026-02-06 00:00:00+01:00"
+      "2021-02-16 00:00:00+01:00",
+      "2026-02-13 00:00:00+01:00"
     ]
   },
   "market/^KS11": {
-    "last_updated": "2026-02-08T20:57:58.958868",
+    "last_updated": "2026-02-13T22:20:09.646243",
     "status": "ok",
-    "rows": 1224,
+    "rows": 1226,
     "date_range": [
-      "2021-02-09 00:00:00+09:00",
-      "2026-02-09 00:00:00+09:00"
+      "2021-02-15 00:00:00+09:00",
+      "2026-02-13 00:00:00+09:00"
     ]
   },
   "market/^BSESN": {
-    "last_updated": "2026-02-08T20:57:59.140708",
+    "last_updated": "2026-02-13T22:20:09.734888",
     "status": "ok",
     "rows": 1233,
     "date_range": [
-      "2021-02-09 00:00:00+05:30",
-      "2026-02-09 00:00:00+05:30"
+      "2021-02-15 00:00:00+05:30",
+      "2026-02-13 00:00:00+05:30"
     ]
   },
   "market/^BVSP": {
-    "last_updated": "2026-02-08T20:57:59.314733",
+    "last_updated": "2026-02-13T22:20:09.820819",
     "status": "ok",
     "rows": 1248,
     "date_range": [
-      "2021-02-08 00:00:00-03:00",
-      "2026-02-06 00:00:00-03:00"
+      "2021-02-17 00:00:00-03:00",
+      "2026-02-13 00:00:00-03:00"
     ]
   },
   "market/^MXX": {
-    "last_updated": "2026-02-08T20:57:59.509371",
+    "last_updated": "2026-02-13T22:20:09.910944",
     "status": "ok",
     "rows": 1259,
     "date_range": [
-      "2021-02-08 00:00:00-06:00",
-      "2026-02-06 00:00:00-06:00"
+      "2021-02-15 00:00:00-06:00",
+      "2026-02-13 00:00:00-06:00"
     ]
   },
   "market/^GDAXI": {
-    "last_updated": "2026-02-08T20:57:59.692669",
+    "last_updated": "2026-02-13T22:20:09.993191",
     "status": "ok",
     "rows": 1275,
     "date_range": [
-      "2021-02-08 00:00:00+01:00",
-      "2026-02-06 00:00:00+01:00"
+      "2021-02-15 00:00:00+01:00",
+      "2026-02-13 00:00:00+01:00"
     ]
   },
   "market/EURUSD=X": {
-    "last_updated": "2026-02-08T20:57:59.873003",
+    "last_updated": "2026-02-13T22:20:10.086143",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/GBPUSD=X": {
-    "last_updated": "2026-02-08T20:58:00.063871",
+    "last_updated": "2026-02-13T22:20:10.195777",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/USDJPY=X": {
-    "last_updated": "2026-02-08T20:58:00.251299",
+    "last_updated": "2026-02-13T22:20:10.289038",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/USDCNY=X": {
-    "last_updated": "2026-02-08T20:58:00.472269",
+    "last_updated": "2026-02-13T22:20:10.375421",
     "status": "ok",
-    "rows": 1300,
+    "rows": 1301,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-14 00:00:00+00:00"
     ]
   },
   "market/USDCAD=X": {
-    "last_updated": "2026-02-08T20:58:00.652777",
+    "last_updated": "2026-02-13T22:20:10.471196",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/AUDUSD=X": {
-    "last_updated": "2026-02-08T20:58:00.858443",
+    "last_updated": "2026-02-13T22:20:10.561902",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/USDCHF=X": {
-    "last_updated": "2026-02-08T20:58:01.048035",
+    "last_updated": "2026-02-13T22:20:10.662438",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/USDKRW=X": {
-    "last_updated": "2026-02-08T20:58:01.231786",
+    "last_updated": "2026-02-13T22:20:10.747383",
     "status": "ok",
-    "rows": 1300,
+    "rows": 1301,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-14 00:00:00+00:00"
     ]
   },
   "market/USDINR=X": {
-    "last_updated": "2026-02-08T20:58:01.424872",
+    "last_updated": "2026-02-13T22:20:10.846719",
     "status": "ok",
-    "rows": 1300,
+    "rows": 1301,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-14 00:00:00+00:00"
     ]
   },
   "market/USDBRL=X": {
-    "last_updated": "2026-02-08T20:58:01.639678",
+    "last_updated": "2026-02-13T22:20:10.943837",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/USDMXN=X": {
-    "last_updated": "2026-02-08T20:58:01.825876",
+    "last_updated": "2026-02-13T22:20:11.034013",
     "status": "ok",
     "rows": 1300,
     "date_range": [
-      "2021-02-09 00:00:00+00:00",
-      "2026-02-09 00:00:00+00:00"
+      "2021-02-15 00:00:00+00:00",
+      "2026-02-13 00:00:00+00:00"
     ]
   },
   "market/DXY": {
-    "last_updated": "2026-02-08T20:58:01.992254",
+    "last_updated": "2026-02-13T22:20:11.140762",
     "status": "ok",
-    "rows": 1259,
+    "rows": 1258,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-08 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/GC=F": {
-    "last_updated": "2026-02-08T20:58:02.168509",
+    "last_updated": "2026-02-13T22:20:11.224713",
     "status": "ok",
-    "rows": 1259,
+    "rows": 1258,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-08 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/HG=F": {
-    "last_updated": "2026-02-08T20:58:02.331290",
-    "status": "ok",
-    "rows": 1260,
-    "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-08 00:00:00-05:00"
-    ]
-  },
-  "market/CL=F": {
-    "last_updated": "2026-02-08T20:58:02.516583",
+    "last_updated": "2026-02-13T22:20:11.324207",
     "status": "ok",
     "rows": 1259,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-08 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
+    ]
+  },
+  "market/CL=F": {
+    "last_updated": "2026-02-13T22:20:11.417624",
+    "status": "ok",
+    "rows": 1258,
+    "date_range": [
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/BZ=F": {
-    "last_updated": "2026-02-08T20:58:02.691946",
+    "last_updated": "2026-02-13T22:20:11.508908",
     "status": "ok",
-    "rows": 1260,
+    "rows": 1259,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-08 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/^VIX": {
-    "last_updated": "2026-02-08T20:58:02.877904",
+    "last_updated": "2026-02-13T22:20:11.926512",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "market/^MOVE": {
-    "last_updated": "2026-02-08T20:58:03.040375",
+    "last_updated": "2026-02-13T22:20:12.018081",
     "status": "ok",
     "rows": 1247,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/^SOX": {
-    "last_updated": "2026-02-08T20:58:03.196834",
+    "last_updated": "2026-02-13T22:22:30.640537",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/NVDA": {
-    "last_updated": "2026-02-08T20:58:03.421439",
+    "last_updated": "2026-02-13T22:22:30.787209",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/TSM": {
-    "last_updated": "2026-02-08T20:58:03.768060",
+    "last_updated": "2026-02-13T22:22:30.914270",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/ASML": {
-    "last_updated": "2026-02-08T20:58:03.972392",
+    "last_updated": "2026-02-13T22:22:31.034907",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/AMD": {
-    "last_updated": "2026-02-08T20:58:04.152152",
+    "last_updated": "2026-02-13T22:22:31.125698",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/INTC": {
-    "last_updated": "2026-02-08T20:58:04.420214",
+    "last_updated": "2026-02-13T22:22:31.293204",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/AVGO": {
-    "last_updated": "2026-02-08T20:58:04.661920",
+    "last_updated": "2026-02-13T22:22:31.412811",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/QCOM": {
-    "last_updated": "2026-02-08T20:58:04.884001",
+    "last_updated": "2026-02-13T22:22:31.562912",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/MU": {
-    "last_updated": "2026-02-08T20:58:05.152005",
+    "last_updated": "2026-02-13T22:22:31.707447",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/LRCX": {
-    "last_updated": "2026-02-08T20:58:05.384782",
+    "last_updated": "2026-02-13T22:22:31.820250",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/AMAT": {
-    "last_updated": "2026-02-08T20:58:05.625725",
+    "last_updated": "2026-02-13T22:22:31.957666",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/SMH": {
-    "last_updated": "2026-02-08T20:58:05.853911",
+    "last_updated": "2026-02-13T22:22:32.074801",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
   },
   "semi/SOXX": {
-    "last_updated": "2026-02-08T20:58:06.093674",
+    "last_updated": "2026-02-13T22:22:32.207580",
     "status": "ok",
     "rows": 1256,
     "date_range": [
-      "2021-02-08 00:00:00-05:00",
-      "2026-02-06 00:00:00-05:00"
+      "2021-02-16 00:00:00-05:00",
+      "2026-02-13 00:00:00-05:00"
     ]
+  },
+  "imf/bop": {
+    "last_updated": "2026-02-13T22:21:21.238773",
+    "status": "error",
+    "error": "HTTPConnectionPool(host='dataservices.imf.org', port=80): Max retries exceeded with url: /REST/SDMX_JSON.svc/CompactData/BOP/A.US+U2+GB+JP+CN+CA+AU+CH+KR+IN+BR+MX+DE.BCA_BP6_USD?startPeriod=2020&endPeriod=2026 (Caused by ConnectTimeoutError(<HTTPConnection(host='dataservices.imf.org', port=80) at 0x1f282c55bd0>, 'Connection to dataservices.imf.org timed out. (connect timeout=30)'))"
+  },
+  "imf/gold_reserves": {
+    "last_updated": "2026-02-13T22:22:30.422574",
+    "status": "error",
+    "error": "HTTPConnectionPool(host='dataservices.imf.org', port=80): Max retries exceeded with url: /REST/SDMX_JSON.svc/CompactData/IFS/A.US+U2+GB+JP+CN+CA+AU+CH+KR+IN+BR+MX+DE.RAXG_USD?startPeriod=2020&endPeriod=2026 (Caused by ConnectTimeoutError(<HTTPConnection(host='dataservices.imf.org', port=80) at 0x1f281901c70>, 'Connection to dataservices.imf.org timed out. (connect timeout=30)'))"
+  },
+  "policy/events": {
+    "last_updated": "2026-02-13T22:22:43.351289",
+    "status": "ok",
+    "rows": 857,
+    "date_range": [
+      "0",
+      "856"
+    ]
+  },
+  "policy/cb_calendar": {
+    "last_updated": "2026-02-13T22:22:43.358270",
+    "status": "ok",
+    "rows": 32,
+    "date_range": [
+      "0",
+      "31"
+    ]
+  },
+  "policy/tariff_tracker": {
+    "last_updated": "2026-02-13T22:22:43.362370",
+    "status": "ok",
+    "rows": 12,
+    "date_range": [
+      "0",
+      "11"
+    ]
+  },
+  "bis/reer_US": {
+    "last_updated": "2026-02-13T22:22:44.424979",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.US.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_EU": {
+    "last_updated": "2026-02-13T22:22:45.961253",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.XM.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_UK": {
+    "last_updated": "2026-02-13T22:22:47.461816",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.GB.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_JP": {
+    "last_updated": "2026-02-13T22:22:49.958179",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.JP.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_CN": {
+    "last_updated": "2026-02-13T22:22:51.485271",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.CN.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_CA": {
+    "last_updated": "2026-02-13T22:22:53.963100",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.CA.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_AU": {
+    "last_updated": "2026-02-13T22:22:55.485238",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.AU.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_CH": {
+    "last_updated": "2026-02-13T22:22:57.005926",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.CH.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_KR": {
+    "last_updated": "2026-02-13T22:22:58.477633",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.KR.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_IN": {
+    "last_updated": "2026-02-13T22:22:59.968169",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.IN.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_BR": {
+    "last_updated": "2026-02-13T22:23:01.464980",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.BR.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_MX": {
+    "last_updated": "2026-02-13T22:23:02.952244",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.MX.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "bis/reer_DE": {
+    "last_updated": "2026-02-13T22:23:04.492985",
+    "status": "error",
+    "error": "500 Server Error:  for url: https://stats.bis.org/api/v2/data/WS_EER/M.DE.R.B?startPeriod=2015-01&detail=dataonly&format=csv"
+  },
+  "cftc/cot_fx": {
+    "last_updated": "2026-02-13T22:23:12.079532",
+    "status": "ok",
+    "rows": 90,
+    "date_range": [
+      "0",
+      "89"
+    ]
+  },
+  "cftc/cot_rates": {
+    "last_updated": "2026-02-13T22:23:12.083319",
+    "status": "ok",
+    "rows": 42,
+    "date_range": [
+      "0",
+      "41"
+    ]
+  },
+  "cftc/cot_commodities": {
+    "last_updated": "2026-02-13T22:23:12.086825",
+    "status": "ok",
+    "rows": 74,
+    "date_range": [
+      "0",
+      "73"
+    ]
+  },
+  "fred/yield_curve_snapshot": {
+    "last_updated": "2026-02-13T22:19:46.859058",
+    "status": "ok",
+    "rows": 1597,
+    "date_range": [
+      "2020-01-01 00:00:00",
+      "2026-02-12 00:00:00"
+    ]
+  },
+  "fred/fed_funds_futures": {
+    "last_updated": "2026-02-13T22:19:53.229489",
+    "status": "ok",
+    "rows": 6,
+    "date_range": [
+      "0",
+      "5"
+    ]
+  },
+  "fred/USEPUINDXD": {
+    "last_updated": "2026-02-13T22:19:54.279123",
+    "status": "ok",
+    "rows": 4061,
+    "date_range": [
+      "2015-01-01 00:00:00",
+      "2026-02-12 00:00:00"
+    ]
+  },
+  "policy/gpr_index": {
+    "last_updated": "2026-02-13T22:19:55.451728",
+    "status": "error",
+    "error": "Missing optional dependency 'xlrd'. Install xlrd >= 2.0.1 for xls Excel support Use pip or conda to install xlrd."
+  },
+  "market/^BDI": {
+    "last_updated": "2026-02-13T22:20:11.838900",
+    "status": "error",
+    "error": "Empty response from yfinance"
   }
 }
