@@ -14,6 +14,12 @@ from src.processors import compute_implied_rate_path
 
 st.session_state.current_page = "Rates & Credit"
 st.header("Rates & Credit")
+st.markdown("""
+Interest rates set the price of money and drive capital allocation globally. This page tracks the
+yield curve shape (recession predictor), rate expectations (what the market is pricing vs the Fed),
+and credit spreads (stress signals). **Widening spreads + flattening curve = trouble ahead.
+Steepening curve + tightening spreads = risk-on.**
+""")
 
 # --- Load Data ---
 with st.spinner("Loading rates data..."):
@@ -45,6 +51,7 @@ st.divider()
 
 # --- Yield Curve ---
 st.subheader("US Treasury Yield Curve")
+st.markdown("Plots yields from 1-month to 30-year Treasuries. A **normal curve** slopes upward (long rates > short rates). An **inverted curve** (2Y > 10Y) has preceded every US recession since 1970. Watch for re-steepening after inversion — that's when recessions typically *begin*.")
 if not yield_curve.empty:
     st.plotly_chart(
         yield_curve_chart(yield_curve),
@@ -57,6 +64,7 @@ st.divider()
 
 # --- Fed Funds Futures Implied Rate Path ---
 st.subheader("Fed Funds Futures — Implied Rate Path")
+st.markdown("Shows what the futures market expects the Fed to do at each upcoming meeting. The gap between current rate and implied rate = number of cuts/hikes priced in. **When the market prices more cuts than the Fed signals, the correction creates volatility.**")
 if not futures.empty and not fed_funds.empty:
     implied = compute_implied_rate_path(futures, fed_funds.iloc[-1])
 
@@ -87,7 +95,8 @@ st.divider()
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("Credit Spreads")
+    st.subheader("Credit Spreads (OAS)")
+    st.markdown("Option-Adjusted Spreads over Treasuries. **HY OAS > 500 bps** = distress. **IG OAS > 150 bps** = stress. Widening spreads = credit market is pricing in defaults and risk.")
     spreads = pd.DataFrame({
         "HY OAS": hy_oas,
         "IG OAS": ig_oas,
@@ -99,6 +108,7 @@ with col1:
 
 with col2:
     st.subheader("Financial Conditions (NFCI)")
+    st.markdown("Chicago Fed index. **Positive = tight conditions** (restrictive). **Negative = loose** (accommodative). Persistently tight conditions precede slowdowns; very loose conditions fuel asset bubbles.")
     nfci_df = nfci.to_frame(name="NFCI")
     st.plotly_chart(
         line_chart(nfci_df, "National Financial Conditions Index"),
@@ -109,6 +119,7 @@ st.divider()
 
 # --- Real Yields & Breakevens ---
 st.subheader("Real Yields & Breakevens")
+st.markdown("**Real yield** = nominal yield minus expected inflation. Rising real yields tighten financial conditions and pressure growth stocks (higher discount rate). **Breakeven** = market's inflation expectation. When breakevens rise faster than nominal yields, real yields fall and conditions loosen.")
 st.plotly_chart(
     dual_axis_chart(
         real_yield, breakeven,

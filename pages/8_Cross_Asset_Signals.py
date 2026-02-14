@@ -25,7 +25,12 @@ from src.processors import (
 
 st.session_state.current_page = "Cross-Asset Signals"
 st.header("Cross-Asset Signals & Relative Value")
-st.caption("Synthesizes macro data into actionable investment signals across countries and asset classes")
+st.markdown("""
+**The decision page.** This synthesizes data from all other pages into actionable investment signals.
+It combines equity risk premium (are stocks cheap vs bonds?), carry trade attractiveness (which currencies
+offer yield?), capital flow direction (where is money going?), and momentum (is the trend confirming?).
+Use the Total Score to rank countries and the catalyst scorecard to check the policy backdrop.
+""")
 
 selected = st.session_state.get("selected_countries", ["US", "EU", "UK", "JP", "CN"])
 wb_codes = [COUNTRIES[c]["wb_code"] for c in selected]
@@ -37,7 +42,9 @@ wb_to_short = {COUNTRIES[c]["wb_code"]: c for c in selected}
 st.subheader("Relative Value Decision Matrix")
 st.markdown("""
 Combines equity risk premium, carry trade attractiveness, and capital flow direction
-into a single score per country. **Positive = attractive, Negative = avoid.**
+into a single score per country. **Positive = attractive, Negative = avoid.** Each sub-score
+ranges from -1 to +1, so the Total Score ranges from -3 to +3. Countries scoring +2 or higher
+have strong alignment across value, carry, and flows.
 """)
 
 with st.spinner("Computing relative value signals..."):
@@ -93,6 +100,7 @@ st.divider()
 # SECTION 2: Rate Differentials & Carry Trade
 # ===================================================================
 st.subheader("Rate Differentials & Carry Trade")
+st.markdown("Carry trade = borrowing in a low-yield currency and investing in a higher-yield one. **Positive differential** means a country yields more than the US, attracting capital. But carry trades can unwind violently — the JPY carry unwind in 2024 caused a global selloff in hours.")
 
 col1, col2 = st.columns(2)
 
@@ -173,7 +181,7 @@ st.divider()
 # SECTION 4: Cross-Asset Momentum
 # ===================================================================
 st.subheader("Cross-Asset Momentum Dashboard")
-st.markdown("1-month and 3-month return momentum across equities, FX, and commodities.")
+st.markdown("1-month and 3-month return momentum across equities, FX, and commodities. Momentum confirms or contradicts the value thesis — a cheap market with negative momentum may stay cheap longer (value trap). **Green = uptrend, Red = downtrend.** Look for momentum turning positive in undervalued markets.")
 
 with st.spinner("Computing momentum signals..."):
     # Equities
@@ -211,7 +219,9 @@ st.divider()
 st.subheader("Macro Catalyst Scorecard")
 st.markdown("""
 Net policy environment in the last 90 days. Counts bullish vs bearish catalysts
-from trade policy, central bank actions, and geopolitical events.
+from trade policy, central bank actions, and geopolitical events. A **positive net score**
+means more tailwinds than headwinds from policy — supportive for the country's assets.
+A **negative score** means policy is creating headwinds (tariffs, sanctions, rate hikes).
 """)
 
 with st.spinner("Scoring macro catalysts..."):

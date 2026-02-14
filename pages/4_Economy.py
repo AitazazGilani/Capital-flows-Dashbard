@@ -14,6 +14,11 @@ from src.chart_helpers import (
 
 st.session_state.current_page = "Economy"
 st.header("Economy")
+st.markdown("""
+Fundamental economic health across selected countries. GDP growth drives earnings, inflation drives rates,
+employment drives consumption. Compare economies side-by-side to spot which are accelerating vs decelerating
+— capital flows toward growth and away from weakness.
+""")
 
 selected = st.session_state.get("selected_countries", ["US", "EU", "UK", "JP", "CN"])
 wb_codes = [COUNTRIES[c]["wb_code"] for c in selected]
@@ -21,6 +26,7 @@ wb_to_short = {COUNTRIES[c]["wb_code"]: c for c in selected}
 
 # --- GDP Growth ---
 st.subheader("GDP Growth (Annual %)")
+st.markdown("Year-over-year real GDP growth by country. Look for **divergence** — when one economy accelerates while others slow, its currency and equities tend to outperform. Negative growth = technical recession.")
 with st.spinner("Loading GDP data..."):
     gdp_growth = get_wb_indicator(WB_INDICATORS["gdp_growth"], wb_codes, start_year=2010)
     gdp_growth.columns = [wb_to_short.get(c, c) for c in gdp_growth.columns]
@@ -36,6 +42,7 @@ st.divider()
 
 # --- Inflation ---
 st.subheader("Inflation (CPI YoY %)")
+st.markdown("Consumer price inflation vs the 2% target. **Above target** = central banks stay hawkish (rates stay high, currencies strengthen). **Below target** = room for rate cuts (bullish for bonds and equities).")
 with st.spinner("Loading inflation data..."):
     inflation = get_wb_indicator(WB_INDICATORS["inflation_cpi"], wb_codes, start_year=2010)
     inflation.columns = [wb_to_short.get(c, c) for c in inflation.columns]
@@ -54,6 +61,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Initial Claims (Weekly)")
+    st.markdown("New unemployment filings. The 4-week moving average smooths noise. Claims **rising above 300K** = labor market deteriorating. This is the fastest economic indicator — data comes weekly, not monthly.")
     with st.spinner("Loading claims data..."):
         initial_claims = get_fred_series(FRED["initial_claims"])
     claims_df = pd.DataFrame({
@@ -67,6 +75,7 @@ with col1:
 
 with col2:
     st.subheader("Continuing Claims")
+    st.markdown("People still receiving unemployment benefits. Rising continuing claims = people aren't finding jobs quickly. This lags initial claims and confirms whether layoffs are turning into sustained unemployment.")
     with st.spinner("Loading continuing claims..."):
         cont_claims = get_fred_series(FRED["continuing_claims"])
     cont_df = pd.DataFrame({
@@ -85,6 +94,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Consumer Sentiment (Michigan)")
+    st.markdown("How consumers feel about the economy. Sentiment leads spending — when it collapses, retail and consumer discretionary stocks follow.")
     with st.spinner("Loading sentiment data..."):
         sentiment = get_fred_series(FRED["consumer_sentiment"])
     sent_df = sentiment.to_frame(name="U of M Sentiment")
@@ -94,7 +104,8 @@ with col1:
     )
 
 with col2:
-    st.subheader("Baltic Dry Index")
+    st.subheader("Baltic Dry Index (BDI)")
+    st.markdown("Cost of shipping raw materials globally. BDI is hard to manipulate (no futures speculation) — it purely reflects real trade demand. **Rising BDI = global trade expanding.** Sharp drops often precede economic slowdowns.")
     with st.spinner("Loading BDI data..."):
         comm_data = get_commodities()
     if "BDI" in comm_data.columns:
@@ -122,6 +133,7 @@ st.divider()
 
 # --- LEI ---
 st.subheader("Leading Economic Index (US)")
+st.markdown("Composite of 10 leading indicators (claims, building permits, stock prices, credit, etc.). **Below 100 = contraction territory.** Six consecutive monthly declines have preceded every recession since 1960.")
 with st.spinner("Loading LEI data..."):
     lei = get_fred_series(FRED["lei"])
 lei_df = lei.to_frame(name="LEI")

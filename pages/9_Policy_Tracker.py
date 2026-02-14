@@ -15,7 +15,12 @@ from src.chart_helpers import (
 
 st.session_state.current_page = "Policy Tracker"
 st.header("Policy & Geopolitical Tracker")
-st.caption("Macro catalysts that drive capital flows and market repricing")
+st.markdown("""
+Tracks **macro catalysts** that move markets and redirect capital flows. Trade policy (tariffs, sanctions),
+central bank decisions (rate changes, QE/QT), and geopolitical events (conflicts, elections) are the
+primary drivers of regime changes in markets. This page aggregates policy events, classifies their
+likely market impact, and tracks the central bank calendar so you're never caught off guard.
+""")
 
 # ===================================================================
 # SECTION 1: Key Metrics — Recent Policy Pulse
@@ -42,6 +47,7 @@ st.divider()
 # SECTION 2: Policy Event Timeline
 # ===================================================================
 st.subheader("Policy Event Timeline")
+st.markdown("Chronological feed of policy actions with impact classification. Use the filters to focus on specific categories, countries, or impact types. Click any event to see sector exposure and detailed analysis.")
 
 # Filters
 col_f1, col_f2, col_f3 = st.columns(3)
@@ -93,6 +99,7 @@ st.divider()
 # SECTION 3: Policy Impact by Category (visual)
 # ===================================================================
 st.subheader("Event Distribution")
+st.markdown("Visual breakdown of policy activity. A skew toward **Negative events** suggests a challenging macro environment for risk assets. High concentration in one category (e.g., Trade Policy) means that sector is the primary source of uncertainty.")
 
 col1, col2 = st.columns(2)
 
@@ -166,7 +173,7 @@ st.divider()
 # SECTION 5: Tariff & Trade Policy Tracker
 # ===================================================================
 st.subheader("US Tariff & Trade Policy Tracker")
-st.markdown("Current effective tariff rates and recent changes. Tariffs are a primary driver of supply chain shifts and capital reallocation.")
+st.markdown("Current vs pre-2025 tariff rates by sector. **Red-highlighted rates** have increased. Rising tariffs are inflationary (higher import costs), disruptive to supply chains, and trigger retaliation — all of which redirect capital flows. Sectors with the biggest rate increases face the most disruption.")
 
 tariff_data = get_tariff_tracker()
 
@@ -214,6 +221,7 @@ st.divider()
 # SECTION 6: Key Themes & Investment Implications
 # ===================================================================
 st.subheader("Key Macro Themes")
+st.markdown("The structural narratives shaping capital allocation over months to years. Each theme has an associated status and investment direction. **Escalating/Elevated** themes require active risk management. **Improving** themes create opportunities.")
 
 themes = [
     {

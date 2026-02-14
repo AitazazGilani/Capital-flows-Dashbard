@@ -15,8 +15,13 @@ from src.chart_helpers import (
 from src.processors import compute_flow_signals
 
 st.session_state.current_page = "Capital Flows"
-st.header("⭐ Capital Flows")
-st.caption("Primary analysis page — understanding where global capital is moving")
+st.header("Capital Flows")
+st.markdown("""
+**The most important page on this dashboard.** Capital flows are the ultimate driver of exchange rates,
+asset prices, and economic power. This page tracks the four channels through which money moves between countries:
+current account (trade), FDI (long-term investment), reserves (central bank actions), and FX (market pricing).
+When all four align, the signal is strong.
+""")
 
 selected = st.session_state.get("selected_countries", ["US", "EU", "UK", "JP", "CN"])
 wb_codes = [COUNTRIES[c]["wb_code"] for c in selected]
@@ -43,6 +48,7 @@ with st.spinner("Loading capital flows data..."):
 
 # --- Current Account Balance ---
 st.subheader("Current Account Balance (% GDP)")
+st.markdown("The broadest measure of a country's external position. **Surplus** (positive) = earning more from abroad than spending (net capital exporter, e.g. Germany, Japan). **Deficit** (negative) = spending more than earning (net capital importer, e.g. US, UK). Persistent deficits require continuous capital inflows to finance — when those dry up, the currency drops.")
 view_mode = st.radio("View", ["% GDP", "Time Series"], horizontal=True, key="ca_view")
 
 if view_mode == "% GDP":
@@ -65,6 +71,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Trade Balance")
+    st.markdown("Goods and services exports minus imports. Large deficits mean the country is consuming more than it produces and importing capital to finance it.")
     latest_trade = trade_balance.iloc[-1] / 1e9  # Convert to billions
     st.plotly_chart(
         bar_chart(latest_trade, "Trade Balance ($B) — Latest"),
@@ -73,6 +80,7 @@ with col1:
 
 with col2:
     st.subheader("FDI (Inflows vs Outflows)")
+    st.markdown("Foreign Direct Investment — long-term capital (factories, acquisitions). **Net positive = foreigners investing more in the country than its companies invest abroad.** FDI is the stickiest form of capital — it doesn't flee in a crisis like portfolio flows.")
     fdi_net = fdi_inflows - fdi_outflows
     fdi_net.columns = [c for c in fdi_net.columns]
 
@@ -91,6 +99,7 @@ st.divider()
 
 # --- Foreign Reserves ---
 st.subheader("Foreign Reserves (excl. Gold)")
+st.markdown("Central bank war chest. Reserves are built up during surplus periods and drawn down to defend the currency during stress. **Rapidly declining reserves** = central bank fighting capital outflows (e.g. Turkey, Argentina). Rising reserves = strong external position.")
 reserves_bn = reserves / 1e9
 st.plotly_chart(
     line_chart(reserves_bn, "Foreign Reserves ($B)", yaxis_title="$Billions"),
@@ -101,6 +110,7 @@ st.divider()
 
 # --- Gold Reserves ---
 st.subheader("Gold Reserves")
+st.markdown("Central bank gold holdings. Countries accumulating gold (China, Russia, India) are diversifying away from USD reserves — a structural tailwind for gold prices and a signal of de-dollarization.")
 with st.spinner("Loading gold reserves..."):
     gold_data = {}
     for c in selected:
@@ -146,7 +156,8 @@ else:
 st.divider()
 
 # --- Capital Flow Signals Summary ---
-st.subheader("Capital Flow Signals Summary")
+st.subheader("Capital Flow Signals — Composite View")
+st.markdown("Combines all four channels into a single signal per country. **Inflow** = multiple indicators agree capital is entering. **Outflow** = capital leaving. Use this to identify which countries are gaining vs losing capital on a structural basis.")
 
 # Compute flow signals
 signals = compute_flow_signals(ca_pct_gdp, reserves, fdi_net, fx_data)

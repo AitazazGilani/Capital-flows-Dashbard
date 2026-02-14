@@ -12,6 +12,13 @@ from src.processors import compute_copper_gold_ratio
 
 st.session_state.current_page = "Sentiment"
 st.header("Sentiment")
+st.markdown("""
+Measures **fear and greed** across markets using volatility, positioning, and survey data.
+Sentiment extremes are contrarian indicators — when everyone is fearful (VIX > 30, positioning very short),
+markets often bottom. When complacency reigns (VIX < 15, max long), risk increases. This page combines
+real-time volatility, speculative futures positioning (CFTC COT), and policy uncertainty to gauge the
+market's emotional state.
+""")
 
 # --- Load Data ---
 with st.spinner("Loading sentiment data..."):
@@ -21,6 +28,7 @@ with st.spinner("Loading sentiment data..."):
 
 # --- VIX ---
 st.subheader("VIX — Equity Volatility")
+st.markdown("The S&P 500 fear gauge. **Below 15** = complacency (potential for a sharp move higher in vol). **20-25** = elevated caution. **Above 30** = high fear, historically a contrarian buy signal. The percentile rank tells you how current vol compares to history.")
 
 vix = vol_data["VIX"]
 fig_vix = go.Figure()
@@ -62,6 +70,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Copper/Gold Ratio")
+    st.markdown("Copper = industrial demand, Gold = fear. **Rising ratio = risk-on** (growth optimism). **Falling ratio = risk-off** (flight to safety). Often leads equity moves by 2-4 weeks.")
     ratio = compute_copper_gold_ratio(comm_data["Copper"], comm_data["Gold"])
     ratio_df = ratio.to_frame()
     st.plotly_chart(
@@ -75,6 +84,7 @@ with col1:
 
 with col2:
     st.subheader("MOVE Index — Bond Volatility")
+    st.markdown("Treasury market volatility. When MOVE spikes **before** VIX, it signals a rates-driven selloff (more dangerous). When VIX spikes alone, it's equity-specific. A low VIX/MOVE ratio means equity vol is compressed relative to bond vol — watch for catch-up.")
     move = vol_data["MOVE"]
     move_df = move.to_frame(name="MOVE")
     st.plotly_chart(
@@ -92,6 +102,7 @@ st.divider()
 
 # --- Consumer Sentiment ---
 st.subheader("Consumer Sentiment (University of Michigan)")
+st.markdown("How consumers feel about the economy and their finances. Sentiment leads spending — when it collapses, retail and discretionary stocks follow. Readings **below the historical average** suggest pessimism; extreme lows can be contrarian buy signals.")
 
 sent_df = pd.DataFrame({"Sentiment": sentiment})
 hist_avg = sentiment.mean()
@@ -128,6 +139,7 @@ st.divider()
 
 # --- CFTC COT Positioning ---
 st.subheader("Futures Positioning (CFTC COT)")
+st.markdown("Shows how **speculators** (hedge funds, CTAs) are positioned in futures markets. Net long = bullish consensus, net short = bearish. **Extreme positioning** often precedes reversals — when everyone is on the same side of the trade, the unwind can be violent. % Long above 70% or below 30% = crowded.")
 
 cot_fx = get_cot_data("fx")
 cot_rates = get_cot_data("rates")
@@ -181,6 +193,7 @@ st.divider()
 
 # --- Geopolitical & Policy Uncertainty ---
 st.subheader("Geopolitical & Policy Risk")
+st.markdown("Two complementary measures of uncertainty. **EPU** tracks economic policy uncertainty (taxes, regulation, trade policy). **GPR** tracks geopolitical threats and military actions. Spikes in both indices correlate with risk-off moves, VIX increases, and flight to safe havens (USD, gold, Treasuries).")
 
 epu = get_epu_index()
 gpr_df = get_gpr_index()

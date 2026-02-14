@@ -20,12 +20,19 @@ from src.processors import compute_semi_relative_strength
 
 st.session_state.current_page = "Strategic Sectors"
 st.header("Strategic Sectors: Semiconductors")
-st.caption("The semiconductor cycle drives capex, trade policy, and geopolitical tension — making it a key macro input")
+st.markdown("""
+Semiconductors sit at the intersection of **trade policy, geopolitics, and the business cycle**.
+The semi cycle leads the broader economy by 6-12 months — when chip demand turns, everything from
+industrial capex to consumer electronics follows. This page tracks SOX vs S&P relative strength,
+individual stock performance, the industry revenue/inventory cycle, and policy events that reshape
+the competitive landscape. Use it to time sector exposure and identify macro turning points.
+""")
 
 # ===================================================================
 # SECTION 1: SOX vs S&P 500 Relative Performance
 # ===================================================================
 st.subheader("Semiconductors vs Broad Market")
+st.markdown("SOX (Philadelphia Semiconductor Index) vs S&P 500. **Semis lead the cycle** — when SOX relative strength breaks down, it typically precedes broader market weakness by 2-3 months. Persistent outperformance confirms the growth/capex cycle is intact.")
 
 with st.spinner("Loading semiconductor data..."):
     semi_vs_mkt = get_semi_vs_market()
@@ -90,6 +97,7 @@ st.divider()
 # SECTION 2: Key Semiconductor Stocks
 # ===================================================================
 st.subheader("Key Semiconductor Stocks")
+st.markdown("Individual stock performance across different timeframes. Look for **divergence within the sector** — if NVDA rallies but INTC lags, it signals AI demand is strong but legacy chip demand is weak. Broad sector strength is more bullish than concentrated leadership.")
 
 # Performance table
 perf_data = {}
@@ -122,6 +130,7 @@ st.divider()
 # SECTION 3: Semiconductor Revenue & Inventory Cycle
 # ===================================================================
 st.subheader("Semiconductor Industry Cycle")
+st.markdown("The two most important industry indicators: **revenue trend** (are sales growing?) and **book-to-bill ratio** (are new orders outpacing shipments?). Book-to-bill above 1.0 = expansion phase. Inventory days indicate whether the supply chain is lean (bullish) or bloated (correction risk).")
 
 with st.spinner("Loading industry cycle data..."):
     revenue_cycle = get_semi_revenue_cycle()
@@ -223,6 +232,7 @@ st.divider()
 # SECTION 4: Semiconductor ETFs
 # ===================================================================
 st.subheader("Semiconductor ETFs")
+st.markdown("ETF performance comparison normalized to 100. **SMH** (VanEck) is the largest and most liquid. **SOXX** (iShares) has broader exposure. Divergence between ETFs can signal differences in large-cap vs mid-cap semi performance.")
 st.plotly_chart(
     line_chart(semi_etf, "Semi ETFs (Indexed)", normalize=True),
     use_container_width=True,
@@ -234,6 +244,7 @@ st.divider()
 # SECTION 5: Semi-Relevant Policy Events
 # ===================================================================
 st.subheader("Policy Events Affecting Semiconductors")
+st.markdown("Export controls, CHIPS Act funding, and geopolitical developments that directly impact the semiconductor supply chain. These events create **winners** (subsidy recipients, domestic capacity builders) and **losers** (companies with China revenue exposure, sanctioned entities).")
 
 events = get_policy_events()
 semi_events = events[events["sectors"].str.contains("Semi", case=False, na=False)]
