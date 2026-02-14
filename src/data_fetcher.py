@@ -107,8 +107,8 @@ def get_dxy(period: str = "5y") -> pd.DataFrame:
 
 @st.cache_data(ttl=900)
 def get_commodities(period: str = "5y") -> pd.DataFrame:
-    """Gold, Copper, WTI, Brent from Parquet."""
-    comm_map = {"Gold": "GC=F", "Copper": "HG=F", "WTI": "CL=F", "Brent": "BZ=F"}
+    """Gold, Copper, WTI, Brent, BDI from Parquet."""
+    comm_map = {"Gold": "GC=F", "Copper": "HG=F", "WTI": "CL=F", "Brent": "BZ=F", "BDI": "^BDI"}
     comm_data = {}
     for name, ticker in comm_map.items():
         pq = _load_parquet("market", ticker)
@@ -347,6 +347,58 @@ def get_central_bank_calendar() -> pd.DataFrame:
 def get_tariff_tracker() -> pd.DataFrame:
     """Track current effective tariff rates from Parquet."""
     pq = _load_parquet("policy", "tariff_tracker")
+    if pq is not None:
+        return pq
+    return pd.DataFrame()
+
+
+# ---------------------------------------------------------------------------
+# BIS REER Data
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=2592000)
+def get_bis_reer(country: str) -> pd.DataFrame:
+    """Real Effective Exchange Rate from BIS from Parquet."""
+    pq = _load_parquet("bis", f"reer_{country}")
+    if pq is not None:
+        return pq
+    return pd.DataFrame()
+
+
+# ---------------------------------------------------------------------------
+# CFTC Commitments of Traders
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=86400)
+def get_cot_data(category: str = "fx") -> pd.DataFrame:
+    """CFTC COT positioning data from Parquet.
+    category: 'fx', 'rates', or 'commodities'"""
+    pq = _load_parquet("cftc", f"cot_{category}")
+    if pq is not None:
+        pq["date"] = pd.to_datetime(pq["date"])
+        return pq.sort_values(["contract", "date"]).reset_index(drop=True)
+    return pd.DataFrame()
+
+
+# ---------------------------------------------------------------------------
+# Geopolitical / Policy Uncertainty Indices
+# ---------------------------------------------------------------------------
+
+@st.cache_data(ttl=86400)
+def get_epu_index() -> pd.Series:
+    """Economic Policy Uncertainty Index from FRED Parquet."""
+    pq = _load_parquet("fred", "USEPUINDXD")
+    if pq is not None:
+        series = pq.iloc[:, 0]
+        series.name = "EPU"
+        return series.ffill()
+    return pd.Series(dtype=float, name="EPU")
+
+
+@st.cache_data(ttl=86400)
+def get_gpr_index() -> pd.DataFrame:
+    """Caldara-Iacoviello Geopolitical Risk Index from Parquet."""
+    pq = _load_parquet("policy", "gpr_index")
     if pq is not None:
         return pq
     return pd.DataFrame()

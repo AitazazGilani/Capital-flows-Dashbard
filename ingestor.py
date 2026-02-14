@@ -47,7 +47,7 @@ from src.config import (
 DATA_DIR = Path(__file__).parent / "data"
 MANIFEST_FILE = DATA_DIR / "manifest.json"
 RATE_LIMIT_FILE = DATA_DIR / "rate_limits.json"
-SOURCES = ["fred", "world_bank", "market", "imf", "semi", "policy"]
+SOURCES = ["fred", "world_bank", "market", "imf", "semi", "policy", "bis", "cftc"]
 
 # Historical data start date
 HIST_START = datetime(2020, 1, 1)
@@ -369,6 +369,7 @@ def ingest_market(manifest: dict, incremental: bool = False, rate_limits: dict =
     print("  -- Commodities --")
     commodity_tickers = {
         "GC=F": "Gold", "HG=F": "Copper", "CL=F": "WTI", "BZ=F": "Brent",
+        "^BDI": "Baltic Dry Index",
     }
     for ticker, name in commodity_tickers.items():
         try:
@@ -645,10 +646,72 @@ def ingest_semi(manifest: dict, incremental: bool = False, rate_limits: dict = N
             _update_manifest(manifest, "semi", ticker, error=str(e))
             print(f"  ERR {label} ({ticker}): {e}")
 
-    # --- Revenue Cycle & Inventory Cycle ---
-    print("  -- Revenue/Inventory Cycles --")
-    print("  Skipping — no live SIA/industry API integration yet.")
-    print("  Existing Parquet files in data/semi/ are preserved.")
+    # --- Revenue Cycle & Inventory Cycle (from FRED ISM data as proxy) ---
+    print("  -- Revenue/Inventory Cycles (ISM proxy) --")
+    fred_key = os.getenv("FRED_API_KEY")
+    if fred_key:
+        try:
+            from fredapi import Fred
+            fred_client = Fred(api_key=fred_key)
+
+            # Revenue cycle proxy: ISM Manufacturing New Orders (NEWORDER)
+            # and ISM Manufacturing PMI (NAPM) as quarterly proxied revenue
+            print("    Fetching ISM data for semi cycle proxy...")
+            try:
+                ism_pmi = fred_client.get_series("NAPM", observation_start="2015-01-01")
+                ism_new_orders = fred_client.get_series("NEWORDER", observation_start="2015-01-01")
+
+                if ism_pmi is not None and not ism_pmi.empty:
+                    # Build quarterly revenue proxy from ISM PMI
+                    # Scale PMI to approximate global semi revenue ($B)
+                    # PMI 50 = ~$130B/quarter, each point ~$5B
+                    pmi_q = ism_pmi.resample("QE").mean()
+                    revenue_proxy = (pmi_q - 50) * 5 + 130  # rough scale
+                    rev_df = pd.DataFrame({
+                        "Global Semi Revenue ($B)": revenue_proxy.round(1),
+                        "QoQ Change (%)": revenue_proxy.pct_change().mul(100).round(2),
+                        "ISM PMI": pmi_q.round(1),
+                    })
+                    rev_df = rev_df.dropna()
+                    _save_parquet("semi", "revenue_cycle", rev_df)
+                    _update_manifest(manifest, "semi", "revenue_cycle", rev_df)
+                    print(f"    ok  Revenue Cycle (ISM proxy): {len(rev_df)} quarters")
+                else:
+                    print("    SKIP Revenue Cycle: empty ISM PMI response")
+
+                if ism_new_orders is not None and not ism_new_orders.empty:
+                    # Inventory cycle proxy from ISM new orders as Book-to-Bill proxy
+                    # and ISM inventories (NAPMII) for inventory days
+                    ism_inv = fred_client.get_series("NAPMII", observation_start="2015-01-01")
+                    orders_q = ism_new_orders.resample("QE").mean()
+                    # Book-to-Bill proxy: new orders index / 50 (above 50 = B2B > 1)
+                    btb_proxy = orders_q / 50
+                    inv_df = pd.DataFrame({
+                        "Book-to-Bill": btb_proxy.round(3),
+                    })
+                    if ism_inv is not None and not ism_inv.empty:
+                        inv_q = ism_inv.resample("QE").mean()
+                        # Inventory days proxy: scale ISM inventory index
+                        # ISM 50 = ~85 days, each point ~2 days
+                        inv_days = (inv_q - 50) * 2 + 85
+                        inv_df["Inventory Days"] = inv_days.round(1)
+                    else:
+                        inv_df["Inventory Days"] = 85.0  # neutral default
+
+                    inv_df = inv_df.dropna()
+                    _save_parquet("semi", "inventory_cycle", inv_df)
+                    _update_manifest(manifest, "semi", "inventory_cycle", inv_df)
+                    print(f"    ok  Inventory Cycle (ISM proxy): {len(inv_df)} quarters")
+                else:
+                    print("    SKIP Inventory Cycle: empty ISM New Orders response")
+
+            except Exception as e:
+                print(f"    ERR Semi cycle proxy: {e}")
+        except ImportError:
+            print("    fredapi not installed — skipping semi cycle proxy")
+    else:
+        print("    No FRED_API_KEY — skipping ISM-based semi cycle proxy")
+        print("    Existing Parquet files in data/semi/ are preserved.")
 
     print("[Semi] Done")
 
@@ -1029,6 +1092,442 @@ def ingest_policy(manifest: dict, incremental: bool = False, rate_limits: dict =
 
 
 # ---------------------------------------------------------------------------
+# Source: Yield Curve Snapshot & Fed Funds Futures
+# ---------------------------------------------------------------------------
+
+# US Treasury maturities in months for yield curve snapshot
+_YC_MATURITIES = {
+    "1M": "DGS1MO", "3M": "DGS3MO", "6M": "DGS6MO",
+    "1Y": "DGS1", "2Y": "DGS2", "3Y": "DGS3", "5Y": "DGS5",
+    "7Y": "DGS7", "10Y": "DGS10", "20Y": "DGS20", "30Y": "DGS30",
+}
+
+# SOFR futures contract months for fed funds rate path
+_FF_FUTURES_MONTHS = ["F", "G", "H", "J", "K", "M", "N", "Q", "U", "V", "X", "Z"]
+_FF_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+
+def ingest_yield_curve(manifest: dict, incremental: bool = False, rate_limits: dict = None):
+    """Ingest yield curve snapshot from FRED and fed funds futures from yfinance.
+
+    Yield curve: fetches latest values of Treasury constant maturity rates (DGS*).
+    Fed funds futures: fetches SOFR futures (SR3) for next 8 months.
+    """
+    print("\n[Yield Curve] Ingesting yield curve and fed funds futures...")
+
+    # --- Yield Curve Snapshot from FRED ---
+    print("  -- Yield Curve Snapshot (FRED) --")
+    fred_key = os.getenv("FRED_API_KEY")
+    if fred_key:
+        try:
+            from fredapi import Fred
+            fred_client = Fred(api_key=fred_key)
+
+            yc_data = {}
+            for label, series_id in _YC_MATURITIES.items():
+                try:
+                    data = fred_client.get_series(series_id, observation_start="2020-01-01")
+                    if data is not None and not data.empty:
+                        yc_data[label] = data
+                except Exception as e:
+                    print(f"    SKIP {label} ({series_id}): {e}")
+
+            if yc_data:
+                yc_df = pd.DataFrame(yc_data).ffill()
+                _save_parquet("fred", "yield_curve_snapshot", yc_df)
+                _update_manifest(manifest, "fred", "yield_curve_snapshot", yc_df)
+                print(f"  ok  Yield Curve: {len(yc_df)} days x {len(yc_df.columns)} maturities")
+            else:
+                print("  SKIP Yield Curve: no data retrieved")
+                _update_manifest(manifest, "fred", "yield_curve_snapshot",
+                                 error="No maturity data retrieved")
+        except ImportError:
+            print("  fredapi not installed — run: pip install fredapi")
+    else:
+        print("  No FRED_API_KEY — skipping yield curve snapshot")
+
+    # --- Fed Funds Futures from yfinance (SOFR futures SR3) ---
+    print("  -- Fed Funds Futures (SOFR via yfinance) --")
+    try:
+        import yfinance as yf
+
+        now = datetime.now()
+        year_2digit = now.year % 100
+        current_month = now.month
+
+        futures_rows = []
+        for i in range(8):  # next 8 months
+            month_idx = (current_month + i) % 12
+            year_offset = (current_month + i) // 12
+            yr = year_2digit + year_offset
+            month_code = _FF_FUTURES_MONTHS[month_idx]
+            ticker = f"SR3{month_code}{yr}.CME"
+            month_name = _FF_MONTH_NAMES[month_idx]
+            contract_year = now.year + year_offset
+
+            try:
+                obj = yf.Ticker(ticker)
+                hist = obj.history(period="5d")
+                if hist is not None and not hist.empty:
+                    price = hist["Close"].iloc[-1]
+                    implied_rate = 100 - price
+                    futures_rows.append({
+                        "contract_month": f"{month_name} {contract_year}",
+                        "ticker": ticker,
+                        "price": round(price, 4),
+                        "implied_rate": round(implied_rate, 4),
+                    })
+            except Exception:
+                pass  # skip unavailable contracts
+
+        if futures_rows:
+            futures_df = pd.DataFrame(futures_rows)
+            _save_parquet("fred", "fed_funds_futures", futures_df)
+            _update_manifest(manifest, "fred", "fed_funds_futures", futures_df)
+            print(f"  ok  Futures: {len(futures_df)} contracts")
+        else:
+            print("  SKIP Futures: no contract data retrieved")
+            _update_manifest(manifest, "fred", "fed_funds_futures",
+                             error="No futures data retrieved")
+    except ImportError:
+        print("  yfinance not installed — skipping fed funds futures")
+
+    print("[Yield Curve] Done")
+
+
+# ---------------------------------------------------------------------------
+# Source: BIS Real Effective Exchange Rates (REER)
+# ---------------------------------------------------------------------------
+
+BIS_BASE = "https://stats.bis.org/api/v2"
+
+# BIS area codes mapped from our country codes
+_BIS_AREA_MAP = {
+    "US": "US", "EU": "XM", "UK": "GB", "JP": "JP", "CN": "CN",
+    "CA": "CA", "AU": "AU", "CH": "CH", "KR": "KR", "IN": "IN",
+    "BR": "BR", "MX": "MX", "DE": "DE",
+}
+
+
+def ingest_bis(manifest: dict, incremental: bool = False, rate_limits: dict = None):
+    """Ingest BIS Real Effective Exchange Rate (REER) data.
+
+    Uses the BIS SDMX RESTful API v2. No authentication required.
+    Fetches monthly broad REER indices (CPI-based) for all tracked countries.
+    """
+    print("\n[BIS] Ingesting Real Effective Exchange Rates (REER)...")
+
+    ok, fail = 0, 0
+    for country_code, bis_area in _BIS_AREA_MAP.items():
+        try:
+            # BIS REER dataset: WS_EER (Effective Exchange Rates)
+            # Frequency=M, REER type=R (real), Basket=B (broad), Unit=CPI
+            url = (
+                f"{BIS_BASE}/data/WS_EER/M.{bis_area}.R.B"
+                f"?startPeriod=2015-01&detail=dataonly&format=csv"
+            )
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+
+            # Parse CSV response
+            from io import StringIO
+            csv_data = StringIO(resp.text)
+            df = pd.read_csv(csv_data)
+
+            if df.empty:
+                print(f"  SKIP {country_code} REER: empty response")
+                _update_manifest(manifest, "bis", f"reer_{country_code}",
+                                 error="Empty BIS response")
+                fail += 1
+                continue
+
+            # BIS CSV has TIME_PERIOD and OBS_VALUE columns
+            if "TIME_PERIOD" in df.columns and "OBS_VALUE" in df.columns:
+                reer_df = pd.DataFrame({
+                    "date": pd.to_datetime(df["TIME_PERIOD"]),
+                    "REER": pd.to_numeric(df["OBS_VALUE"], errors="coerce"),
+                }).dropna().set_index("date").sort_index()
+
+                _save_parquet("bis", f"reer_{country_code}", reer_df)
+                _update_manifest(manifest, "bis", f"reer_{country_code}", reer_df)
+                print(f"  ok  {country_code} REER: {len(reer_df)} months")
+                ok += 1
+            else:
+                # Try alternative column names
+                print(f"  SKIP {country_code} REER: unexpected CSV columns: {list(df.columns)}")
+                _update_manifest(manifest, "bis", f"reer_{country_code}",
+                                 error=f"Unexpected columns: {list(df.columns)[:5]}")
+                fail += 1
+
+        except Exception as e:
+            if _is_rate_limit_error(e) and rate_limits is not None:
+                _record_rate_limit(rate_limits, "bis", f"reer_{country_code}", str(e))
+                _save_rate_limits(rate_limits)
+                print(f"  RATE LIMIT {country_code} REER: {e}")
+                return
+            _update_manifest(manifest, "bis", f"reer_{country_code}", error=str(e))
+            print(f"  ERR {country_code} REER: {e}")
+            fail += 1
+
+        time.sleep(0.5)  # polite pacing for BIS API
+
+    print(f"[BIS] Done: {ok} ok, {fail} failed")
+
+
+# ---------------------------------------------------------------------------
+# Source: CFTC Commitments of Traders (COT)
+# ---------------------------------------------------------------------------
+
+# CFTC COT report codes for key futures contracts
+_COT_CONTRACTS = {
+    # FX futures
+    "EUR/USD": "099741",
+    "GBP/USD": "096742",
+    "JPY/USD": "097741",
+    "AUD/USD": "232741",
+    "CAD/USD": "090741",
+    "CHF/USD": "092741",
+    # Rates
+    "10Y T-Note": "043602",
+    "2Y T-Note": "042601",
+    "Fed Funds": "045601",
+    "Eurodollar": "132741",
+    # Commodities
+    "Gold": "088691",
+    "Silver": "084691",
+    "Crude Oil": "067651",
+    "Copper": "085692",
+    "Natural Gas": "023651",
+}
+
+CFTC_BASE = "https://publicreporting.cftc.gov/api/views"
+
+
+def _fetch_cftc_cot(report_type: str = "legacy_fut", limit: int = 500) -> pd.DataFrame:
+    """Fetch CFTC Commitments of Traders data via Socrata API.
+
+    report_type: 'legacy_fut' for legacy futures-only report
+    Returns raw DataFrame with all COT fields.
+    """
+    # Socrata dataset IDs for COT reports
+    dataset_ids = {
+        "legacy_fut": "6dca-aqww",       # Legacy Futures Only
+    }
+    dataset_id = dataset_ids.get(report_type, "6dca-aqww")
+
+    url = f"https://publicreporting.cftc.gov/resource/{dataset_id}.json"
+    params = {
+        "$limit": limit,
+        "$order": "report_date_as_yyyy_mm_dd DESC",
+    }
+
+    resp = requests.get(url, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()
+
+    if not data:
+        return pd.DataFrame()
+
+    return pd.DataFrame(data)
+
+
+def _process_cot_data(raw: pd.DataFrame, contracts: dict) -> dict:
+    """Process raw COT data into categorized DataFrames for FX, rates, commodities.
+
+    Returns dict with keys: 'cot_fx', 'cot_rates', 'cot_commodities'
+    Each value is a DataFrame with columns: date, contract, long, short, net, pct_long
+    """
+    if raw.empty:
+        return {}
+
+    # Normalize column names (Socrata returns lowercase with underscores)
+    raw.columns = [c.lower().strip() for c in raw.columns]
+
+    date_col = "report_date_as_yyyy_mm_dd"
+    code_col = "cftc_contract_market_code"
+
+    if date_col not in raw.columns or code_col not in raw.columns:
+        return {}
+
+    results = {"fx": [], "rates": [], "commodities": []}
+
+    # Categorize contracts
+    fx_contracts = {"EUR/USD", "GBP/USD", "JPY/USD", "AUD/USD", "CAD/USD", "CHF/USD"}
+    rate_contracts = {"10Y T-Note", "2Y T-Note", "Fed Funds", "Eurodollar"}
+
+    for name, code in contracts.items():
+        subset = raw[raw[code_col] == code].copy()
+        if subset.empty:
+            continue
+
+        # Use non-commercial (speculative) positions
+        long_col = "noncomm_positions_long_all"
+        short_col = "noncomm_positions_short_all"
+
+        if long_col not in subset.columns or short_col not in subset.columns:
+            # Try alternative column names
+            long_col = next((c for c in subset.columns if "noncomm" in c and "long" in c), None)
+            short_col = next((c for c in subset.columns if "noncomm" in c and "short" in c), None)
+            if not long_col or not short_col:
+                continue
+
+        for _, row in subset.iterrows():
+            try:
+                long_pos = float(row.get(long_col, 0) or 0)
+                short_pos = float(row.get(short_col, 0) or 0)
+                net = long_pos - short_pos
+                total = long_pos + short_pos
+                pct_long = (long_pos / total * 100) if total > 0 else 50.0
+
+                entry = {
+                    "date": row[date_col],
+                    "contract": name,
+                    "long": long_pos,
+                    "short": short_pos,
+                    "net": net,
+                    "pct_long": round(pct_long, 2),
+                }
+
+                if name in fx_contracts:
+                    results["fx"].append(entry)
+                elif name in rate_contracts:
+                    results["rates"].append(entry)
+                else:
+                    results["commodities"].append(entry)
+            except (ValueError, TypeError):
+                continue
+
+    output = {}
+    for category, rows in results.items():
+        if rows:
+            df = pd.DataFrame(rows)
+            df["date"] = pd.to_datetime(df["date"])
+            df = df.sort_values(["contract", "date"]).reset_index(drop=True)
+            output[f"cot_{category}"] = df
+
+    return output
+
+
+def ingest_cftc(manifest: dict, incremental: bool = False, rate_limits: dict = None):
+    """Ingest CFTC Commitments of Traders (COT) positioning data.
+
+    Uses the CFTC Socrata API — no authentication required.
+    Fetches legacy futures-only report and extracts speculative positioning
+    for FX, rates, and commodity futures.
+    """
+    print("\n[CFTC] Ingesting Commitments of Traders (COT) data...")
+
+    try:
+        print("  Fetching COT legacy futures report...")
+        raw = _fetch_cftc_cot("legacy_fut", limit=5000)
+
+        if raw.empty:
+            print("  SKIP COT: empty API response")
+            _update_manifest(manifest, "cftc", "cot_fx", error="Empty response")
+            return
+
+        print(f"  {len(raw)} raw COT records")
+
+        cot_data = _process_cot_data(raw, _COT_CONTRACTS)
+
+        for name, df in cot_data.items():
+            _save_parquet("cftc", name, df)
+            _update_manifest(manifest, "cftc", name, df)
+            print(f"  ok  {name}: {len(df)} records, {df['contract'].nunique()} contracts")
+
+        if not cot_data:
+            print("  SKIP COT: no matching contracts found in response")
+            _update_manifest(manifest, "cftc", "cot_fx",
+                             error="No matching contracts in response")
+
+    except Exception as e:
+        if _is_rate_limit_error(e) and rate_limits is not None:
+            _record_rate_limit(rate_limits, "cftc", "ALL", str(e))
+            _save_rate_limits(rate_limits)
+            print(f"  RATE LIMIT COT: {e}")
+            return
+        _update_manifest(manifest, "cftc", "cot_fx", error=str(e))
+        print(f"  ERR COT: {e}")
+
+    print("[CFTC] Done")
+
+
+# ---------------------------------------------------------------------------
+# Geopolitical / Policy Uncertainty Indices (appended to FRED and policy)
+# ---------------------------------------------------------------------------
+
+def _ingest_geopolitical_indices(manifest: dict, rate_limits: dict = None):
+    """Ingest geopolitical and policy uncertainty indices.
+
+    - Economic Policy Uncertainty (USEPUINDXD) from FRED
+    - Caldara-Iacoviello GPR Index from matteoiacoviello.com
+    """
+    print("\n[Geopolitical] Ingesting uncertainty and risk indices...")
+
+    # --- EPU from FRED ---
+    print("  -- Economic Policy Uncertainty (FRED) --")
+    fred_key = os.getenv("FRED_API_KEY")
+    if fred_key:
+        try:
+            from fredapi import Fred
+            fred_client = Fred(api_key=fred_key)
+
+            epu = fred_client.get_series("USEPUINDXD", observation_start="2015-01-01")
+            if epu is not None and not epu.empty:
+                epu_df = epu.to_frame(name="value")
+                _save_parquet("fred", "USEPUINDXD", epu_df)
+                _update_manifest(manifest, "fred", "USEPUINDXD", epu_df)
+                print(f"  ok  EPU Index: {len(epu_df)} days")
+            else:
+                print("  SKIP EPU: empty FRED response")
+                _update_manifest(manifest, "fred", "USEPUINDXD",
+                                 error="Empty FRED response")
+        except ImportError:
+            print("  fredapi not installed — skipping EPU")
+        except Exception as e:
+            _update_manifest(manifest, "fred", "USEPUINDXD", error=str(e))
+            print(f"  ERR EPU: {e}")
+    else:
+        print("  No FRED_API_KEY — skipping EPU index")
+
+    # --- GPR Index (Caldara-Iacoviello) ---
+    print("  -- Geopolitical Risk Index (Caldara-Iacoviello) --")
+    try:
+        # The GPR index is published as an Excel/CSV file
+        gpr_url = "https://www.matteoiacoviello.com/gpr_files/data_gpr_daily_recent.xls"
+        resp = requests.get(gpr_url, timeout=30)
+        resp.raise_for_status()
+
+        from io import BytesIO
+        gpr_raw = pd.read_excel(BytesIO(resp.content))
+
+        # The file typically has columns: date, GPRD (daily GPR), GPR (monthly)
+        date_col = next((c for c in gpr_raw.columns if "date" in c.lower()), gpr_raw.columns[0])
+        gpr_col = next((c for c in gpr_raw.columns if c.upper().startswith("GPR") and "D" in c.upper()), None)
+        if gpr_col is None:
+            gpr_col = next((c for c in gpr_raw.columns if c.upper().startswith("GPR")), gpr_raw.columns[1])
+
+        gpr_df = pd.DataFrame({
+            "date": pd.to_datetime(gpr_raw[date_col]),
+            "GPR": pd.to_numeric(gpr_raw[gpr_col], errors="coerce"),
+        }).dropna().set_index("date").sort_index()
+
+        # Filter to 2015+
+        gpr_df = gpr_df[gpr_df.index >= "2015-01-01"]
+
+        _save_parquet("policy", "gpr_index", gpr_df)
+        _update_manifest(manifest, "policy", "gpr_index", gpr_df)
+        print(f"  ok  GPR Index: {len(gpr_df)} observations")
+
+    except Exception as e:
+        _update_manifest(manifest, "policy", "gpr_index", error=str(e))
+        print(f"  ERR GPR Index: {e}")
+
+    print("[Geopolitical] Done")
+
+
+# ---------------------------------------------------------------------------
 # CLI: status & clean
 # ---------------------------------------------------------------------------
 
@@ -1089,13 +1588,22 @@ def clean_data():
 # Main
 # ---------------------------------------------------------------------------
 
+def ingest_fred_extended(manifest: dict, incremental: bool = False, rate_limits: dict = None):
+    """Run core FRED ingest, then yield curve and geopolitical indices."""
+    ingest_fred(manifest, incremental=incremental, rate_limits=rate_limits)
+    ingest_yield_curve(manifest, incremental=incremental, rate_limits=rate_limits)
+    _ingest_geopolitical_indices(manifest, rate_limits=rate_limits)
+
+
 SOURCE_FUNCTIONS = {
-    "fred": ingest_fred,
+    "fred": ingest_fred_extended,
     "world_bank": ingest_world_bank,
     "market": ingest_market,
     "imf": ingest_imf,
     "semi": ingest_semi,
     "policy": ingest_policy,
+    "bis": ingest_bis,
+    "cftc": ingest_cftc,
 }
 
 

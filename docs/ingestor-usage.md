@@ -64,12 +64,14 @@ python ingestor.py --update
 Ingest only one data source. Useful for debugging or targeted updates.
 
 ```bash
-python ingestor.py --source fred         # FRED macro series only
+python ingestor.py --source fred         # FRED macro series + yield curve + EPU + GPR
 python ingestor.py --source world_bank   # World Bank indicators only
-python ingestor.py --source market       # Equity, FX, commodities, volatility
+python ingestor.py --source market       # Equity, FX, commodities, volatility, BDI
 python ingestor.py --source imf          # IMF BOP and gold reserves
-python ingestor.py --source semi         # Semiconductor stocks, cycles
+python ingestor.py --source semi         # Semiconductor stocks + ISM cycle proxy
 python ingestor.py --source policy       # Policy events, CB calendar, tariffs
+python ingestor.py --source bis          # BIS Real Effective Exchange Rates
+python ingestor.py --source cftc         # CFTC Commitments of Traders
 ```
 
 Combine with `--update` for incremental single-source updates:
@@ -115,12 +117,14 @@ python ingestor.py --clean
 
 | Source | Parquet Directory | # Files | Live API | Status |
 |--------|------------------|---------|----------|--------|
-| `fred` | `data/fred/` | 21 | FRED API (needs `FRED_API_KEY`) | Requires API key |
+| `fred` | `data/fred/` | 21+ | FRED API (needs `FRED_API_KEY`) + yield curve + EPU | Requires API key |
 | `world_bank` | `data/world_bank/` | 12 | wbgapi (no key needed) | Ready |
-| `market` | `data/market/` | ~32 | yfinance (no key needed) | Ready |
+| `market` | `data/market/` | ~33 | yfinance (no key needed) — includes BDI | Ready |
 | `imf` | `data/imf/` | 2 | IMF SDMX JSON API (no key needed) | Ready |
-| `semi` | `data/semi/` | ~15 | yfinance for stocks/ETFs | Stocks ready; cycles need SIA API |
-| `policy` | `data/policy/` | 3 | Federal Register API (no key needed) | Ready |
+| `semi` | `data/semi/` | ~15 | yfinance + ISM PMI cycle proxy (needs `FRED_API_KEY`) | Ready |
+| `policy` | `data/policy/` | 4+ | Federal Register API + GPR Index (no key needed) | Ready |
+| `bis` | `data/bis/` | 13 | BIS SDMX REST API (no key needed) | Ready |
+| `cftc` | `data/cftc/` | 3 | CFTC Socrata API (no key needed) | Ready |
 
 ## Parquet File Format
 
@@ -217,72 +221,29 @@ def get_some_data(period="5y"):
 
 The ingestor must be run to populate data before the dashboard shows content.
 
-## Planned Integrations
+## Recently Added Integrations
 
-The following integrations are not yet built but would close the biggest data gaps in the dashboard. Listed in priority order by ROI.
+The following integrations were added and are ready to use:
 
-### 1. Semiconductor Industry Cycle Data — Pages 10 (Strategic Sectors)
+| # | Integration | Source | Pages | Ingest Command |
+|---|-------------|--------|-------|---------------|
+| 1 | Semi Industry Cycles (ISM proxy) | FRED `NAPM`, `NEWORDER`, `NAPMII` | Page 10 | `--source semi` (needs `FRED_API_KEY`) |
+| 2 | Yield Curve Snapshot | FRED `DGS*` maturities (1M–30Y) | Page 3 | `--source fred` (needs `FRED_API_KEY`) |
+| 3 | Fed Funds Futures | yfinance SOFR futures `SR3*.CME` | Page 3 | `--source fred` |
+| 4 | BIS REER | `stats.bis.org` SDMX REST API | Pages 5, 6 | `--source bis` |
+| 5 | Baltic Dry Index | yfinance `^BDI` | Page 4 | `--source market` |
+| 6 | CFTC COT Positioning | CFTC Socrata API | Page 7 | `--source cftc` |
+| 7 | EPU Index | FRED `USEPUINDXD` | Page 7 | `--source fred` (needs `FRED_API_KEY`) |
+| 8 | GPR Index | Caldara-Iacoviello XLS download | Page 7 | `--source fred` |
 
-**Gap:** Revenue cycle and inventory cycle charts are empty. Cycle phase analysis doesn't work.
+## Future Integrations
 
-| Integration | API / Source | Auth | What it provides |
-|-------------|-------------|------|------------------|
-| SIA Global Chip Sales | `semiconductors.org` monthly reports | Scrape or manual CSV | Monthly worldwide semiconductor revenue for revenue cycle chart |
-| ISM Manufacturing PMI | FRED series `NAPMPI` (prices) / `MANEMP` (employment) | `FRED_API_KEY` | Proxy for inventory/B2B cycle when SIA data unavailable |
-
-**Parquet targets:** `data/semi/revenue_cycle.parquet`, `data/semi/inventory_cycle.parquet`
-
-### 2. Yield Curve Snapshot & Fed Funds Futures — Page 3 (Rates & Credit)
-
-**Gap:** Yield curve chart and implied rate path table show "data not available".
-
-| Integration | API / Source | Auth | What it provides |
-|-------------|-------------|------|------------------|
-| US Treasury Yield Curve | `api.fiscaldata.treasury.gov/services/api/fiscal_service/v2/accounting/od/avg_interest_rates` | None | Daily yields across maturities (1M–30Y) for curve snapshot |
-| CME FedWatch proxy | Derive from FRED `DFF` + eurodollar/SOFR futures via yfinance | None | Implied fed funds rate path for next 6–8 meetings |
-
-**Parquet targets:** `data/fred/yield_curve_snapshot.parquet`, `data/fred/fed_funds_futures.parquet`
-
-### 3. BIS Real Effective Exchange Rates (REER) — Pages 5, 6 (Capital Flows, Country Risk)
-
-**Gap:** No inflation-adjusted FX view. Nominal FX alone is misleading for capital flow analysis.
-
-| Integration | API / Source | Auth | What it provides |
-|-------------|-------------|------|------------------|
-| BIS REER (Broad) | `stats.bis.org/api/v2` (SDMX REST) | None | Monthly REER indices for all major economies, adjusts for CPI differentials |
-
-**Parquet targets:** `data/bis/reer_{country}.parquet`
-
-### 4. Baltic Dry Index (BDI) — Page 4 (Economy)
-
-**Gap:** Economy page references BDI but it's missing from the commodities ticker list, causing a KeyError.
-
-| Integration | API / Source | Auth | What it provides |
-|-------------|-------------|------|------------------|
-| BDI | yfinance ticker `^BDI` | None | Global shipping demand proxy — leading indicator for trade volumes |
-
-**Fix:** Add `^BDI` to `MARKET_TICKERS` commodities list in `src/config.py` and re-run `python ingestor.py --source market`.
-
-### 5. CFTC Commitments of Traders (COT) — Page 7 (Sentiment)
-
-**Gap:** No futures positioning data. COT is a widely-used sentiment/positioning signal.
-
-| Integration | API / Source | Auth | What it provides |
-|-------------|-------------|------|------------------|
-| CFTC COT Reports | `publicreporting.cftc.gov` weekly CSV/API | None | Net speculative positioning in FX, rates, and commodity futures |
-
-**Parquet targets:** `data/cftc/cot_fx.parquet`, `data/cftc/cot_rates.parquet`, `data/cftc/cot_commodities.parquet`
-
-### 6. Geopolitical / Policy Uncertainty Indices — Pages 7, 8 (Sentiment, Cross-Asset)
-
-**Gap:** No geopolitical risk overlay on sentiment or cross-asset pages.
-
-| Integration | API / Source | Auth | What it provides |
-|-------------|-------------|------|------------------|
-| Economic Policy Uncertainty | FRED series `USEPUINDXD` | `FRED_API_KEY` | Daily US policy uncertainty index |
-| Caldara-Iacoviello GPR Index | `matteoiacoviello.com/gpr.asp` (monthly CSV download) | None | Global geopolitical risk index (wars, terror, tensions) |
-
-**Parquet targets:** `data/fred/USEPUINDXD.parquet`, `data/policy/gpr_index.parquet`
+| Integration | Why | Difficulty |
+|-------------|-----|-----------|
+| SIA actual revenue data | Replace ISM proxy with real semi revenue | Medium (web scrape) |
+| ECB Statistical Data Warehouse | Official EUR reference rates | Low (SDMX REST) |
+| OECD CLI (Composite Leading Indicators) | Better cross-country leading indicators | Low (SDMX REST) |
+| IIF / EPFR Fund Flows | Actual portfolio flow data (equity/bond by region) | High (paid API) |
 
 ---
 

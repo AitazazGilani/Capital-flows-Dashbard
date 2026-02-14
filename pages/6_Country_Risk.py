@@ -15,6 +15,12 @@ from src.processors import compute_risk_scores
 
 st.session_state.current_page = "Country Risk"
 st.header("Country Risk")
+st.markdown("""
+Assesses each country's **fiscal health and vulnerability** to capital flight. Debt sustainability,
+budget deficits, foreign reserves, and gold holdings together reveal how resilient a country is to
+external shocks. High debt + twin deficits (budget + current account) = fragile. Strong reserves +
+surplus = resilient. Use the deep-dive selector to examine any country's full risk profile.
+""")
 
 selected = st.session_state.get("selected_countries", ["US", "EU", "UK", "JP", "CN"])
 wb_codes = [COUNTRIES[c]["wb_code"] for c in selected]
@@ -49,6 +55,7 @@ with st.spinner("Loading country risk data..."):
 
 # --- Deep Dive Scorecard ---
 st.subheader(f"Scorecard: {COUNTRIES[deep_dive]['name']}")
+st.markdown("Key macro indicators at a glance. Compare GDP growth, debt burden, external balance, reserve buffer, and fiscal position to assess overall country health.")
 
 dd_metrics = []
 if deep_dive in gdp_growth.columns and not gdp_growth[deep_dive].dropna().empty:
@@ -78,6 +85,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Foreign Reserves")
+    st.markdown("Central bank foreign currency holdings. **Declining reserves** signal a country is spending to defend its currency or cover external obligations — a stress indicator. Rising reserves = building a safety buffer.")
     reserves_bn = reserves / 1e9
     st.plotly_chart(
         line_chart(reserves_bn, "Foreign Reserves ($B)"),
@@ -86,6 +94,7 @@ with col1:
 
 with col2:
     st.subheader("Gold Reserves")
+    st.markdown("Gold provides a sanctions-resistant reserve asset. Countries **accumulating gold** (China, Russia, India) are diversifying away from USD — a structural de-dollarization signal.")
     gold_data = {}
     for c in selected:
         imf_c = COUNTRIES[c]["imf_code"]
@@ -107,6 +116,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Debt-to-GDP")
+    st.markdown("Government debt as a percentage of GDP. **Above 100%** = debt exceeds annual output (Japan ~260%, US ~120%). High debt constrains fiscal policy and raises borrowing costs. Watch the trajectory — rising fast is worse than being high but stable.")
     st.plotly_chart(
         line_chart(debt_gdp, "Government Debt (% GDP)"),
         use_container_width=True,
@@ -114,6 +124,7 @@ with col1:
 
 with col2:
     st.subheader("Budget Balance (% GDP)")
+    st.markdown("Government revenue minus spending. **Negative = deficit** (spending more than collecting). Persistent deficits require bond issuance, which increases supply and can push yields higher. Surplus countries have more policy flexibility in a downturn.")
     latest_budget = budget.iloc[-1]
     st.plotly_chart(
         bar_chart(latest_budget, "Budget Balance (% GDP) — Latest"),
@@ -124,6 +135,7 @@ st.divider()
 
 # --- Comparative Risk Table ---
 st.subheader("Comparative Risk Scores")
+st.markdown("Composite score combining debt/GDP, current account, reserves, and budget balance. **Higher score = higher risk.** Countries scoring above 60 have vulnerabilities that could trigger capital flight during a global stress event.")
 
 risk_scores = compute_risk_scores(debt_gdp, ca_gdp, reserves, budget)
 

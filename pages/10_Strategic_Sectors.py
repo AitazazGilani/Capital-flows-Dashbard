@@ -20,12 +20,19 @@ from src.processors import compute_semi_relative_strength
 
 st.session_state.current_page = "Strategic Sectors"
 st.header("Strategic Sectors: Semiconductors")
-st.caption("The semiconductor cycle drives capex, trade policy, and geopolitical tension — making it a key macro input")
+st.markdown("""
+Semiconductors sit at the intersection of **trade policy, geopolitics, and the business cycle**.
+The semi cycle leads the broader economy by 6-12 months — when chip demand turns, everything from
+industrial capex to consumer electronics follows. This page tracks SOX vs S&P relative strength,
+individual stock performance, the industry revenue/inventory cycle, and policy events that reshape
+the competitive landscape. Use it to time sector exposure and identify macro turning points.
+""")
 
 # ===================================================================
 # SECTION 1: SOX vs S&P 500 Relative Performance
 # ===================================================================
 st.subheader("Semiconductors vs Broad Market")
+st.markdown("SOX (Philadelphia Semiconductor Index) vs S&P 500. **Semis lead the cycle** — when SOX relative strength breaks down, it typically precedes broader market weakness by 2-3 months. Persistent outperformance confirms the growth/capex cycle is intact.")
 
 with st.spinner("Loading semiconductor data..."):
     semi_vs_mkt = get_semi_vs_market()
@@ -90,6 +97,7 @@ st.divider()
 # SECTION 2: Key Semiconductor Stocks
 # ===================================================================
 st.subheader("Key Semiconductor Stocks")
+st.markdown("Individual stock performance across different timeframes. Look for **divergence within the sector** — if NVDA rallies but INTC lags, it signals AI demand is strong but legacy chip demand is weak. Broad sector strength is more bullish than concentrated leadership.")
 
 # Performance table
 perf_data = {}
@@ -122,93 +130,101 @@ st.divider()
 # SECTION 3: Semiconductor Revenue & Inventory Cycle
 # ===================================================================
 st.subheader("Semiconductor Industry Cycle")
+st.markdown("The two most important industry indicators: **revenue trend** (are sales growing?) and **book-to-bill ratio** (are new orders outpacing shipments?). Book-to-bill above 1.0 = expansion phase. Inventory days indicate whether the supply chain is lean (bullish) or bloated (correction risk).")
 
 with st.spinner("Loading industry cycle data..."):
     revenue_cycle = get_semi_revenue_cycle()
     inventory_cycle = get_semi_inventory_cycle()
 
-col1, col2 = st.columns(2)
+if not revenue_cycle.empty and not inventory_cycle.empty:
+    col1, col2 = st.columns(2)
 
-with col1:
-    st.markdown("**Global Semi Revenue (Quarterly)**")
-    fig_rev = go.Figure()
-    fig_rev.add_trace(go.Bar(
-        x=revenue_cycle.index,
-        y=revenue_cycle["Global Semi Revenue ($B)"],
-        name="Revenue ($B)",
-        marker_color=COLORS[0],
-    ))
-    fig_rev.add_trace(go.Scatter(
-        x=revenue_cycle.index,
-        y=revenue_cycle["QoQ Change (%)"],
-        name="QoQ Change (%)",
-        mode="lines+markers",
-        line=dict(color=COLORS[1], width=2),
-        yaxis="y2",
-    ))
-    fig_rev.update_layout(
-        title="Global Semiconductor Revenue",
-        height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
-        yaxis=dict(title="Revenue ($B)"),
-        yaxis2=dict(title="QoQ %", side="right", overlaying="y"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    st.plotly_chart(fig_rev, use_container_width=True)
-    st.caption("Source: SIA (Semiconductor Industry Association) — free quarterly reports")
+    with col1:
+        st.markdown("**Global Semi Revenue (Quarterly)**")
+        fig_rev = go.Figure()
+        fig_rev.add_trace(go.Bar(
+            x=revenue_cycle.index,
+            y=revenue_cycle["Global Semi Revenue ($B)"],
+            name="Revenue ($B)",
+            marker_color=COLORS[0],
+        ))
+        fig_rev.add_trace(go.Scatter(
+            x=revenue_cycle.index,
+            y=revenue_cycle["QoQ Change (%)"],
+            name="QoQ Change (%)",
+            mode="lines+markers",
+            line=dict(color=COLORS[1], width=2),
+            yaxis="y2",
+        ))
+        fig_rev.update_layout(
+            title="Global Semiconductor Revenue",
+            height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+            yaxis=dict(title="Revenue ($B)"),
+            yaxis2=dict(title="QoQ %", side="right", overlaying="y"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_rev, use_container_width=True)
+        st.caption("Source: ISM PMI proxy for semiconductor revenue cycle")
 
-with col2:
-    st.markdown("**Book-to-Bill & Inventory**")
-    fig_inv = go.Figure()
-    fig_inv.add_trace(go.Scatter(
-        x=inventory_cycle.index,
-        y=inventory_cycle["Book-to-Bill"],
-        name="Book-to-Bill",
-        mode="lines",
-        line=dict(color=COLORS[2], width=2),
-    ))
-    fig_inv.add_hline(y=1.0, line_dash="dash", line_color="yellow",
-                      annotation_text="Expansion/Contraction", annotation_position="right")
-    fig_inv.add_trace(go.Scatter(
-        x=inventory_cycle.index,
-        y=inventory_cycle["Inventory Days"],
-        name="Inventory Days",
-        mode="lines",
-        line=dict(color=COLORS[3], width=2),
-        yaxis="y2",
-    ))
-    fig_inv.update_layout(
-        title="Semi Book-to-Bill & Inventory Days",
-        height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
-        yaxis=dict(title="Book-to-Bill Ratio"),
-        yaxis2=dict(title="Inventory Days", side="right", overlaying="y"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    st.plotly_chart(fig_inv, use_container_width=True)
-    st.caption("Book-to-Bill > 1.0 = orders exceeding shipments (expansion). High inventory days = glut risk.")
+    with col2:
+        st.markdown("**Book-to-Bill & Inventory**")
+        fig_inv = go.Figure()
+        fig_inv.add_trace(go.Scatter(
+            x=inventory_cycle.index,
+            y=inventory_cycle["Book-to-Bill"],
+            name="Book-to-Bill",
+            mode="lines",
+            line=dict(color=COLORS[2], width=2),
+        ))
+        fig_inv.add_hline(y=1.0, line_dash="dash", line_color="yellow",
+                          annotation_text="Expansion/Contraction", annotation_position="right")
+        if "Inventory Days" in inventory_cycle.columns:
+            fig_inv.add_trace(go.Scatter(
+                x=inventory_cycle.index,
+                y=inventory_cycle["Inventory Days"],
+                name="Inventory Days",
+                mode="lines",
+                line=dict(color=COLORS[3], width=2),
+                yaxis="y2",
+            ))
+        fig_inv.update_layout(
+            title="Semi Book-to-Bill & Inventory Days",
+            height=400, template=CHART_TEMPLATE, margin=CHART_MARGINS, font=CHART_FONT,
+            yaxis=dict(title="Book-to-Bill Ratio"),
+            yaxis2=dict(title="Inventory Days", side="right", overlaying="y"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_inv, use_container_width=True)
+        st.caption("Book-to-Bill > 1.0 = orders exceeding shipments (expansion). High inventory days = glut risk.")
 
-# Cycle interpretation
-btb_last = inventory_cycle["Book-to-Bill"].iloc[-1]
-inv_last = inventory_cycle["Inventory Days"].iloc[-1]
+    # Cycle interpretation
+    btb_last = inventory_cycle["Book-to-Bill"].iloc[-1]
+    inv_last = inventory_cycle["Inventory Days"].iloc[-1] if "Inventory Days" in inventory_cycle.columns else 85.0
 
-if btb_last > 1.05 and inv_last < 90:
-    cycle_phase = "Early Upcycle"
-    cycle_color = "green"
-    cycle_desc = "Orders are outpacing shipments while inventories are lean. Best phase for semi stocks."
-elif btb_last > 1.0 and inv_last > 100:
-    cycle_phase = "Late Upcycle"
-    cycle_color = "orange"
-    cycle_desc = "Demand still positive but inventories building. Watch for order corrections."
-elif btb_last < 1.0 and inv_last > 100:
-    cycle_phase = "Downcycle"
-    cycle_color = "red"
-    cycle_desc = "Orders below shipments with elevated inventory. Semi stocks typically bottom before B2B troughs."
+    if btb_last > 1.05 and inv_last < 90:
+        cycle_phase = "Early Upcycle"
+        cycle_color = "green"
+        cycle_desc = "Orders are outpacing shipments while inventories are lean. Best phase for semi stocks."
+    elif btb_last > 1.0 and inv_last > 100:
+        cycle_phase = "Late Upcycle"
+        cycle_color = "orange"
+        cycle_desc = "Demand still positive but inventories building. Watch for order corrections."
+    elif btb_last < 1.0 and inv_last > 100:
+        cycle_phase = "Downcycle"
+        cycle_color = "red"
+        cycle_desc = "Orders below shipments with elevated inventory. Semi stocks typically bottom before B2B troughs."
+    else:
+        cycle_phase = "Recovery"
+        cycle_color = "blue"
+        cycle_desc = "Inventories normalizing, B2B stabilizing. Early positioning opportunity."
+
+    st.markdown(f"**Current cycle phase:** :{cycle_color}[{cycle_phase}]")
+    st.markdown(f"*{cycle_desc}*")
 else:
-    cycle_phase = "Recovery"
-    cycle_color = "blue"
-    cycle_desc = "Inventories normalizing, B2B stabilizing. Early positioning opportunity."
-
-st.markdown(f"**Current cycle phase:** :{cycle_color}[{cycle_phase}]")
-st.markdown(f"*{cycle_desc}*")
+    st.info("Semi cycle data not available. Run `python ingestor.py --source semi` with FRED_API_KEY to ingest ISM-based proxy data.")
+    cycle_phase = "N/A"
+    btb_last = 0
+    inv_last = 0
 
 st.divider()
 
@@ -216,6 +232,7 @@ st.divider()
 # SECTION 4: Semiconductor ETFs
 # ===================================================================
 st.subheader("Semiconductor ETFs")
+st.markdown("ETF performance comparison normalized to 100. **SMH** (VanEck) is the largest and most liquid. **SOXX** (iShares) has broader exposure. Divergence between ETFs can signal differences in large-cap vs mid-cap semi performance.")
 st.plotly_chart(
     line_chart(semi_etf, "Semi ETFs (Indexed)", normalize=True),
     use_container_width=True,
@@ -227,6 +244,7 @@ st.divider()
 # SECTION 5: Semi-Relevant Policy Events
 # ===================================================================
 st.subheader("Policy Events Affecting Semiconductors")
+st.markdown("Export controls, CHIPS Act funding, and geopolitical developments that directly impact the semiconductor supply chain. These events create **winners** (subsidy recipients, domestic capacity builders) and **losers** (companies with China revenue exposure, sanctioned entities).")
 
 events = get_policy_events()
 semi_events = events[events["sectors"].str.contains("Semi", case=False, na=False)]

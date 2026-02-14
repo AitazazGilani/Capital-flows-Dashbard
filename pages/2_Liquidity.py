@@ -12,6 +12,11 @@ from src.processors import compute_net_liquidity
 
 st.session_state.current_page = "Liquidity"
 st.header("Liquidity")
+st.markdown("""
+Liquidity is the single biggest driver of asset prices at a macro level. **Net Liquidity = Fed Balance Sheet - TGA - RRP.**
+When the Fed expands its balance sheet or the Treasury draws down the TGA, dollars flood into the financial system and risk assets rally.
+When RRP usage rises, it drains reserves from banks. This page tracks the plumbing that moves markets before fundamentals do.
+""")
 
 period = YF_PERIOD_MAP.get(st.session_state.get("date_range", "3Y"), "3y")
 
@@ -41,6 +46,7 @@ st.divider()
 
 # --- Net Liquidity vs S&P 500 ---
 st.subheader("Net Liquidity vs S&P 500")
+st.markdown("The core thesis: when net liquidity rises, equities follow. A high correlation confirms that markets are liquidity-driven. When they diverge, either liquidity is about to catch up (buy signal) or equities are about to catch down (sell signal).")
 # Compute correlation
 merged = pd.DataFrame({"Net Liquidity": net_liq, "S&P 500": sp500["Close"]}).dropna()
 if len(merged) > 10:
@@ -62,6 +68,7 @@ st.divider()
 
 # --- Fed Balance Sheet Components ---
 st.subheader("Fed Balance Sheet Components")
+st.markdown("Decomposition of net liquidity into its three parts. The Fed B/S sets the ceiling, then TGA and RRP subtract from available reserves. Watch for TGA drawdowns (Treasury spending = liquidity injection) and RRP declines (reserves moving back to banks).")
 components = pd.DataFrame({
     "Fed B/S": fed_bs,
     "minus TGA": -tga,
@@ -79,6 +86,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("M2 Money Supply (US)")
+    st.markdown("Broad money supply. YoY growth below 0% = monetary contraction (bearish). Turning positive after a contraction = early risk-on signal.")
     m2_df = m2.to_frame(name="M2")
     m2_df["M2 YoY %"] = m2_df["M2"].pct_change(periods=52, fill_method=None) * 100  # approx weekly -> annual
     st.plotly_chart(

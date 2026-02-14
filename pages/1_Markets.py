@@ -16,6 +16,11 @@ from src.processors import compute_copper_gold_ratio
 
 st.session_state.current_page = "Markets"
 st.header("Markets")
+st.markdown("""
+Track real-time price action across the four major asset classes. This page answers:
+**where is money flowing right now?** Equities rising + DXY falling + gold flat = risk-on rotation
+into non-US assets. VIX spike + gold bid + equities down = risk-off.
+""")
 
 selected = st.session_state.get("selected_countries", ["US", "EU", "UK", "JP", "CN"])
 period = YF_PERIOD_MAP.get(st.session_state.get("date_range", "3Y"), "3y")
@@ -46,7 +51,8 @@ metric_row([
 st.divider()
 
 # --- Equity Indices ---
-st.subheader("Equity Indices")
+st.subheader("Global Equity Indices")
+st.markdown("Compare equity performance across selected countries. Normalizing to 100 reveals *relative* outperformance — look for divergences that signal capital rotation between regions.")
 normalize = st.toggle("Normalize to 100", value=True, key="mkt_normalize")
 
 index_tickers = [COUNTRIES[c]["index"] for c in selected]
@@ -68,6 +74,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("FX Rates — % Change")
+    st.markdown("Currency moves relative to USD. Red = weakening against USD (capital outflow signal). Green = strengthening (capital inflow).")
     with st.spinner("Loading FX data..."):
         fx_df = get_fx_rates(selected, period)
     if not fx_df.empty:
@@ -84,7 +91,8 @@ with col1:
         st.info("No FX data for selected countries.")
 
 with col2:
-    st.subheader("DXY Index")
+    st.subheader("US Dollar Index (DXY)")
+    st.markdown("Measures USD against a basket of 6 currencies. DXY above 200-day MA = strong dollar trend. A rising dollar tightens global financial conditions and pressures EM economies.")
     # Add 200-day MA
     dxy_plot = dxy_data[["Close"]].copy()
     dxy_plot.columns = ["DXY"]
@@ -101,6 +109,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Commodities")
+    st.markdown("Normalized to 100 for comparison. Gold rising + copper falling = risk-off. Both rising = inflationary pressure + strong demand.")
     st.plotly_chart(
         line_chart(comm_data, "Commodities", normalize=True),
         use_container_width=True,
@@ -108,13 +117,15 @@ with col1:
 
 with col2:
     st.subheader("Volatility")
+    st.markdown("VIX (equity fear gauge) vs MOVE (bond volatility). When MOVE leads VIX higher, it signals a rates-driven selloff. VIX alone spiking = equity-specific event.")
     st.plotly_chart(
         dual_axis_chart(vol_data["VIX"], vol_data["MOVE"], "VIX", "MOVE", "VIX vs MOVE Index"),
         use_container_width=True,
     )
 
 # --- Copper/Gold Ratio ---
-st.subheader("Copper/Gold Ratio")
+st.subheader("Copper/Gold Ratio — Risk Appetite Barometer")
+st.markdown("Copper is driven by industrial demand, gold by fear. Their ratio is one of the best real-time gauges of global risk appetite. **Rising = risk-on, falling = risk-off.** Divergence from equities often leads by 2-4 weeks.")
 ratio = compute_copper_gold_ratio(comm_data["Copper"], comm_data["Gold"])
 ratio_df = ratio.to_frame()
 st.plotly_chart(
